@@ -3,14 +3,13 @@ export const HOUR_MS = 60 * MINUTE_MS;
 export const DAY_MS = 24 * HOUR_MS;
 
 export const DEFAULT_TIME_ZONE = "Asia/Shanghai";
-export const DEFAULT_APPROACHING_THRESHOLD_MS = 24 * HOUR_MS;
+export const DEFAULT_APPROACHING_THRESHOLD_MS = 48 * HOUR_MS;
 
 export type TaskStatusLike = "ACTIVE" | "COMPLETED" | "ARCHIVED";
 
 export type DeadlineStatus =
   | "normal"
   | "approaching"
-  | "due_today"
   | "overdue"
   | "completed"
   | "archived";
@@ -35,7 +34,6 @@ type DeadlineStatusInput = {
   taskStatus: TaskStatusLike;
   dueAt: Date;
   now?: Date;
-  timeZone?: string;
   approachingThresholdMs?: number;
 };
 
@@ -86,7 +84,6 @@ export function getDeadlineStatus({
   taskStatus,
   dueAt,
   now = new Date(),
-  timeZone = DEFAULT_TIME_ZONE,
   approachingThresholdMs = DEFAULT_APPROACHING_THRESHOLD_MS
 }: DeadlineStatusInput): DeadlineStatus {
   if (taskStatus === "COMPLETED") {
@@ -103,11 +100,7 @@ export function getDeadlineStatus({
     return "overdue";
   }
 
-  if (isSameCalendarDay(dueAt, now, timeZone)) {
-    return "due_today";
-  }
-
-  if (remainingMs <= approachingThresholdMs) {
+  if (remainingMs < approachingThresholdMs) {
     return "approaching";
   }
 

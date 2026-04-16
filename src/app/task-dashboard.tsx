@@ -71,16 +71,12 @@ const STATUS_META: Record<
   }
 > = {
   normal: {
-    label: "正常",
+    label: "进行中",
     toneClass: "border-emerald-500/30 bg-emerald-500/10 text-emerald-200"
   },
   approaching: {
     label: "临近",
     toneClass: "border-amber-400/30 bg-amber-400/10 text-amber-200"
-  },
-  due_today: {
-    label: "今天截止",
-    toneClass: "border-yellow-300/30 bg-yellow-300/10 text-yellow-100"
   },
   overdue: {
     label: "已逾期",
@@ -88,7 +84,7 @@ const STATUS_META: Record<
   },
   completed: {
     label: "已完成",
-    toneClass: "border-stone-400/30 bg-stone-400/10 text-stone-200"
+    toneClass: "border-[#4bae50]/40 bg-[#4bae50]/15 text-[#7ee084]"
   },
   archived: {
     label: "已归档",
@@ -154,9 +150,7 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
       total: visibleTasks.length,
       active: visibleTasks.filter((task) => task.status === "ACTIVE").length,
       approaching: visibleTasks.filter(
-        (task) =>
-          task.deadlineStatus === "approaching" ||
-          task.deadlineStatus === "due_today"
+        (task) => task.deadlineStatus === "approaching"
       ).length,
       completed: visibleTasks.filter((task) => task.status === "COMPLETED")
         .length
@@ -504,6 +498,7 @@ function TaskCard({
 }) {
   const meta = STATUS_META[task.deadlineStatus];
   const isBusy = busyTaskId === task.id;
+  const isCompleted = task.status === "COMPLETED";
 
   return (
     <article className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5">
@@ -525,31 +520,45 @@ function TaskCard({
             </p>
           ) : null}
         </div>
-
-        <div className="grid shrink-0 grid-cols-2 gap-3 text-sm lg:min-w-72">
-          <InfoPill label="剩余" value={task.remainingText} />
-          <InfoPill label="DDL" value={formatDateTime(task.dueDate)} />
+        <div className="shrink-0 lg:self-start">
+          {isCompleted ? (
+            <span
+              aria-label="已完成"
+              className="inline-flex size-10 items-center justify-center rounded-full bg-[#4bae50] text-white shadow-sm"
+              title="已完成"
+            >
+              <CheckIcon />
+            </span>
+          ) : onComplete ? (
+            <button
+              className="inline-flex h-10 items-center justify-center rounded-md bg-[#4bae50] px-4 text-sm font-semibold text-white transition hover:bg-[#449b48] disabled:cursor-not-allowed disabled:opacity-60"
+              disabled={isBusy}
+              onClick={() => onComplete(task.id)}
+              type="button"
+            >
+              {isBusy ? "处理中..." : "标记完成"}
+            </button>
+          ) : null}
         </div>
       </div>
 
       <div className="mt-5">
-        <div className="mb-2 flex items-center justify-between text-xs font-medium text-[var(--muted-foreground)]">
-          <span>DDL 进度</span>
-          <span>{Math.round(task.progress)}%</span>
+        <div className="mb-3 grid gap-3 text-sm sm:grid-cols-3">
+          <InfoPill label="开始" value={formatDateTime(task.startDate)} />
+          <InfoPill label="剩余" value={task.remainingText} />
+          <InfoPill label="DDL" value={formatDateTime(task.dueDate)} />
         </div>
-        <div className="h-2.5 overflow-hidden rounded-md bg-[var(--muted)]">
-          <div
-            className="h-full rounded-md transition-[width]"
-            style={{
-              width: `${task.progress}%`,
-              backgroundColor: getProgressColor(task.progress)
-            }}
-          />
-        </div>
-        <div className="mt-2 flex flex-col gap-1 text-xs text-[var(--muted-foreground)] sm:flex-row sm:justify-between">
-          <span>开始：{formatDateTime(task.startDate)}</span>
-          <span>更新：{formatDateTime(new Date(task.updatedAt))}</span>
-        </div>
+        {isCompleted ? null : (
+          <div className="h-2.5 overflow-hidden rounded-md bg-[var(--muted)]">
+            <div
+              className="h-full rounded-md transition-[width]"
+              style={{
+                width: `${task.progress}%`,
+                backgroundColor: getProgressColor(task.progress)
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {mode === "manage" ? (
@@ -557,14 +566,6 @@ function TaskCard({
           <TaskActionButton onClick={() => onEdit?.(task)}>
             编辑
           </TaskActionButton>
-          {task.status === "ACTIVE" ? (
-            <TaskActionButton
-              disabled={isBusy}
-              onClick={() => onComplete?.(task.id)}
-            >
-              完成
-            </TaskActionButton>
-          ) : null}
           {task.status !== "ARCHIVED" ? (
             <TaskActionButton
               disabled={isBusy}
@@ -583,6 +584,23 @@ function TaskCard({
         </div>
       ) : null}
     </article>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="2.5"
+      viewBox="0 0 24 24"
+    >
+      <path d="m5 12 4 4L19 6" />
+    </svg>
   );
 }
 

@@ -91,15 +91,14 @@ describe("getDeadlineStatus", () => {
     expect(status).toBe("overdue");
   });
 
-  it("returns due_today for tasks due on the same calendar day in the configured timezone", () => {
+  it("returns approaching for active tasks due within 48 hours", () => {
     const status = getDeadlineStatus({
       taskStatus: "ACTIVE",
-      dueAt: new Date("2026-04-16T15:30:00.000Z"),
-      now: new Date("2026-04-16T01:00:00.000Z"),
-      timeZone: "Asia/Shanghai"
+      dueAt: new Date("2026-04-18T01:00:00.000Z"),
+      now: new Date("2026-04-16T02:00:00.000Z")
     });
 
-    expect(status).toBe("due_today");
+    expect(status).toBe("approaching");
   });
 
   it("returns approaching when the deadline is within the threshold", () => {
@@ -107,10 +106,21 @@ describe("getDeadlineStatus", () => {
       taskStatus: "ACTIVE",
       dueAt: new Date("2026-04-17T01:00:00.000Z"),
       now: new Date("2026-04-16T02:00:00.000Z"),
-      approachingThresholdMs: 24 * 60 * 60 * 1000
+      approachingThresholdMs: 48 * 60 * 60 * 1000
     });
 
     expect(status).toBe("approaching");
+  });
+
+  it("returns normal when the deadline is exactly at the threshold", () => {
+    const status = getDeadlineStatus({
+      taskStatus: "ACTIVE",
+      dueAt: new Date("2026-04-18T02:00:00.000Z"),
+      now: new Date("2026-04-16T02:00:00.000Z"),
+      approachingThresholdMs: 48 * 60 * 60 * 1000
+    });
+
+    expect(status).toBe("normal");
   });
 
   it("returns normal when the deadline is not near", () => {
