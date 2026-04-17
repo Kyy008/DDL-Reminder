@@ -46,12 +46,32 @@ type ApiTaskResponse = {
   }>;
 };
 
+type WorkspaceAction = "view" | "add" | "edit" | "delete";
+
 const EMPTY_FORM = {
   title: "",
   description: "",
   startAt: "",
   dueAt: ""
 };
+
+const EDIT_ACTIONS: Array<{
+  id: Exclude<WorkspaceAction, "view">;
+  label: string;
+}> = [
+  {
+    id: "add",
+    label: "添加任务"
+  },
+  {
+    id: "edit",
+    label: "编辑任务"
+  },
+  {
+    id: "delete",
+    label: "删除任务"
+  }
+];
 
 const PROGRESS_START_COLOR = "#4bae50";
 const PROGRESS_MID_COLOR = "#f5c84c";
@@ -104,6 +124,7 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
+  const [activeAction, setActiveAction] = useState<WorkspaceAction>("view");
   const [form, setForm] = useState<TaskFormState>(() => createEmptyForm());
   const [now, setNow] = useState(() => new Date());
 
@@ -115,6 +136,11 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
         cache: "no-store"
       });
       const payload = (await response.json()) as ApiTaskResponse;
+
+      if (response.status === 401) {
+        redirectToLogin();
+        return;
+      }
 
       if (!response.ok) {
         throw new Error(payload.error || "任务加载失败。");
@@ -182,6 +208,11 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
       });
       const data = (await response.json()) as ApiTaskResponse;
 
+      if (response.status === 401) {
+        redirectToLogin();
+        return;
+      }
+
       if (!response.ok || !data.task) {
         throw new Error(getApiError(data));
       }
@@ -211,6 +242,11 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
       });
       const data = (await response.json()) as ApiTaskResponse;
 
+      if (response.status === 401) {
+        redirectToLogin();
+        return;
+      }
+
       if (!response.ok) {
         throw new Error(getApiError(data));
       }
@@ -236,6 +272,7 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
   }
 
   function startEditing(task: TaskView) {
+    setActiveAction("edit");
     setEditingTaskId(task.id);
     setForm({
       title: task.title,
@@ -250,177 +287,357 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
     setForm(createEmptyForm());
   }
 
-  return (
-    <div className="flex flex-col gap-8">
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatBlock
-          cardClass="border-[#5f34b0] bg-[#5f34b0]"
-          label="全部任务"
-          labelClass="text-white"
-          value={stats.total}
-          valueClass="text-white"
-        />
-        <StatBlock
-          cardClass="border-[#57bfda] bg-[#57bfda]"
-          label="进行中"
-          labelClass="text-white"
-          value={stats.active}
-          valueClass="text-white"
-        />
-        <StatBlock
-          cardClass="border-[#ff0000] bg-[#ff0000]"
-          label="临近截止"
-          labelClass="text-white"
-          value={stats.approaching}
-          valueClass="text-white"
-        />
-        <StatBlock
-          cardClass="border-[#4bae50] bg-[#4bae50]"
-          label="已完成"
-          labelClass="text-white"
-          value={stats.completed}
-          valueClass="text-white"
-        />
-      </section>
+  function switchAction(action: WorkspaceAction) {
+    setActiveAction(action);
+    setError(null);
+    resetForm();
+  }
 
-      {isManageMode ? (
-        <section className="grid gap-6 xl:grid-cols-[minmax(340px,0.75fr)_1.25fr]">
-          <form
-            className="flex flex-col gap-4 rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5"
-            onSubmit={handleSubmit}
-          >
-            <div>
-              <p className="text-sm font-semibold text-[var(--primary)]">
-                {editingTaskId ? "编辑任务" : "新增任务"}
-              </p>
-              <h2 className="mt-2 text-2xl font-semibold">
-                {editingTaskId ? "调整 DDL 信息" : "写下新的 DDL"}
-              </h2>
-            </div>
-
-            <label className="flex flex-col gap-2 text-sm font-medium">
-              标题
-              <input
-                className="h-11 rounded-md border border-[var(--border)] bg-[var(--field)] px-3 text-base text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
-                onChange={(event) =>
-                  setForm((currentForm) => ({
-                    ...currentForm,
-                    title: event.target.value
-                  }))
-                }
-                placeholder="例如：提交课程论文"
-                required
-                value={form.title}
-              />
-            </label>
-
-            <label className="flex flex-col gap-2 text-sm font-medium">
-              描述
-              <textarea
-                className="min-h-28 resize-y rounded-md border border-[var(--border)] bg-[var(--field)] px-3 py-2 text-base leading-6 text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
-                onChange={(event) =>
-                  setForm((currentForm) => ({
-                    ...currentForm,
-                    description: event.target.value
-                  }))
-                }
-                placeholder="材料、链接、提交要求..."
-                value={form.description}
-              />
-            </label>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="flex flex-col gap-2 text-sm font-medium">
-                开始时间
-                <input
-                  className="h-11 rounded-md border border-[var(--border)] bg-[var(--field)] px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
-                  onChange={(event) =>
-                    setForm((currentForm) => ({
-                      ...currentForm,
-                      startAt: event.target.value
-                    }))
-                  }
-                  required
-                  type="datetime-local"
-                  value={form.startAt}
-                />
-              </label>
-
-              <label className="flex flex-col gap-2 text-sm font-medium">
-                DDL 时间
-                <input
-                  className="h-11 rounded-md border border-[var(--border)] bg-[var(--field)] px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
-                  onChange={(event) =>
-                    setForm((currentForm) => ({
-                      ...currentForm,
-                      dueAt: event.target.value
-                    }))
-                  }
-                  required
-                  type="datetime-local"
-                  value={form.dueAt}
-                />
-              </label>
-            </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <button
-                className="inline-flex h-11 items-center justify-center rounded-md bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)] disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={isSubmitting}
-                type="submit"
-              >
-                {isSubmitting
-                  ? "保存中..."
-                  : editingTaskId
-                    ? "保存修改"
-                    : "添加任务"}
-              </button>
-              {editingTaskId ? (
-                <button
-                  className="inline-flex h-11 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--panel)] px-4 text-sm font-semibold"
-                  onClick={resetForm}
-                  type="button"
-                >
-                  取消编辑
-                </button>
-              ) : null}
-            </div>
-          </form>
-
-          <TaskList
-            busyTaskId={busyTaskId}
-            isLoading={isLoading}
-            mode={mode}
-            onArchive={(taskId) =>
-              runTaskAction(taskId, `/api/tasks/${taskId}/archive`, "POST")
-            }
-            onComplete={(taskId) =>
-              runTaskAction(taskId, `/api/tasks/${taskId}/complete`, "POST")
-            }
-            onDelete={(taskId) => {
-              if (window.confirm("确认删除这个任务吗？")) {
-                void runTaskAction(taskId, `/api/tasks/${taskId}`, "DELETE");
-              }
-            }}
-            onEdit={startEditing}
-            tasks={visibleTasks}
-          />
-        </section>
-      ) : (
+  if (!isManageMode) {
+    return (
+      <div className="flex flex-col gap-8">
+        <StatsSection stats={stats} />
         <TaskList
           busyTaskId={busyTaskId}
           isLoading={isLoading}
           mode={mode}
           tasks={visibleTasks}
         />
-      )}
+      </div>
+    );
+  }
 
-      {error ? (
-        <p className="rounded-md border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm font-medium text-rose-200">
-          {error}
-        </p>
-      ) : null}
+  return (
+    <div className="flex h-full min-h-0 overflow-hidden">
+      <TaskSidebar activeAction={activeAction} onSwitch={switchAction} />
+
+      <section className="min-w-0 flex-1 overflow-y-auto px-5 py-6 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-6xl flex-col gap-8">
+          <StatsSection stats={stats} />
+
+          {activeAction === "view" ? (
+            <TaskList
+              busyTaskId={busyTaskId}
+              isLoading={isLoading}
+              mode="public"
+              onComplete={(taskId) =>
+                runTaskAction(taskId, `/api/tasks/${taskId}/complete`, "POST")
+              }
+              tasks={visibleTasks}
+            />
+          ) : null}
+
+          {activeAction === "add" ? (
+            <section className="max-w-3xl">
+              <TaskEditorHeader eyebrow="添加任务" title="写下新的 DDL" />
+              <TaskEditorForm
+                form={form}
+                isSubmitting={isSubmitting}
+                onChange={setForm}
+                onSubmit={handleSubmit}
+                submitLabel="添加任务"
+                submittingLabel="添加中..."
+              />
+            </section>
+          ) : null}
+
+          {activeAction === "edit" ? (
+            <section className="grid gap-6 xl:grid-cols-[minmax(340px,0.75fr)_1.25fr]">
+              <TaskList
+                busyTaskId={busyTaskId}
+                isLoading={isLoading}
+                mode="manage"
+                onEdit={startEditing}
+                tasks={visibleTasks}
+              />
+              <section>
+                <TaskEditorHeader
+                  eyebrow="编辑任务"
+                  title={editingTaskId ? "调整 DDL 信息" : "选择一个任务"}
+                />
+                {editingTaskId ? (
+                  <TaskEditorForm
+                    form={form}
+                    isSubmitting={isSubmitting}
+                    onChange={setForm}
+                    onSubmit={handleSubmit}
+                    submitLabel="保存修改"
+                    submittingLabel="保存中..."
+                  />
+                ) : (
+                  <p className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--panel)] p-8 text-sm text-[var(--muted-foreground)]">
+                    从左侧任务列表点击“编辑”后，这里会显示编辑表单。
+                  </p>
+                )}
+              </section>
+            </section>
+          ) : null}
+
+          {activeAction === "delete" ? (
+            <section>
+              <TaskEditorHeader eyebrow="删除任务" title="选择要删除的 DDL" />
+              <TaskList
+                busyTaskId={busyTaskId}
+                isLoading={isLoading}
+                mode="manage"
+                onDelete={(taskId) => {
+                  if (window.confirm("确认删除这个任务吗？")) {
+                    void runTaskAction(
+                      taskId,
+                      `/api/tasks/${taskId}`,
+                      "DELETE"
+                    );
+                  }
+                }}
+                tasks={visibleTasks}
+              />
+            </section>
+          ) : null}
+
+          {error ? (
+            <p className="rounded-md border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm font-medium text-rose-200">
+              {error}
+            </p>
+          ) : null}
+        </div>
+      </section>
     </div>
+  );
+}
+
+function TaskEditorHeader({
+  eyebrow,
+  title
+}: {
+  eyebrow: string;
+  title: string;
+}) {
+  return (
+    <div className="mb-5 rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5">
+      <p className="text-sm font-semibold text-[var(--primary)]">{eyebrow}</p>
+      <h2 className="mt-2 text-2xl font-semibold">{title}</h2>
+    </div>
+  );
+}
+
+function TaskEditorForm({
+  form,
+  isSubmitting,
+  onChange,
+  onSubmit,
+  submitLabel,
+  submittingLabel
+}: {
+  form: TaskFormState;
+  isSubmitting: boolean;
+  onChange: (update: (currentForm: TaskFormState) => TaskFormState) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  submitLabel: string;
+  submittingLabel: string;
+}) {
+  return (
+    <form
+      className="flex flex-col gap-4 rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5"
+      onSubmit={onSubmit}
+    >
+      <label className="flex flex-col gap-2 text-sm font-medium">
+        标题
+        <input
+          className="h-11 rounded-md border border-[var(--border)] bg-[var(--field)] px-3 text-base text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
+          onChange={(event) =>
+            onChange((currentForm) => ({
+              ...currentForm,
+              title: event.target.value
+            }))
+          }
+          placeholder="例如：提交课程论文"
+          required
+          value={form.title}
+        />
+      </label>
+
+      <label className="flex flex-col gap-2 text-sm font-medium">
+        描述
+        <textarea
+          className="min-h-28 resize-y rounded-md border border-[var(--border)] bg-[var(--field)] px-3 py-2 text-base leading-6 text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
+          onChange={(event) =>
+            onChange((currentForm) => ({
+              ...currentForm,
+              description: event.target.value
+            }))
+          }
+          placeholder="材料、链接、提交要求..."
+          value={form.description}
+        />
+      </label>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="flex flex-col gap-2 text-sm font-medium">
+          开始时间
+          <input
+            className="h-11 rounded-md border border-[var(--border)] bg-[var(--field)] px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
+            onChange={(event) =>
+              onChange((currentForm) => ({
+                ...currentForm,
+                startAt: event.target.value
+              }))
+            }
+            required
+            type="datetime-local"
+            value={form.startAt}
+          />
+        </label>
+
+        <label className="flex flex-col gap-2 text-sm font-medium">
+          DDL 时间
+          <input
+            className="h-11 rounded-md border border-[var(--border)] bg-[var(--field)] px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
+            onChange={(event) =>
+              onChange((currentForm) => ({
+                ...currentForm,
+                dueAt: event.target.value
+              }))
+            }
+            required
+            type="datetime-local"
+            value={form.dueAt}
+          />
+        </label>
+      </div>
+
+      <button
+        className="h-11 rounded-md bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)] disabled:cursor-not-allowed disabled:opacity-60"
+        disabled={isSubmitting}
+        type="submit"
+      >
+        {isSubmitting ? submittingLabel : submitLabel}
+      </button>
+    </form>
+  );
+}
+
+function StatsSection({
+  stats
+}: {
+  stats: {
+    total: number;
+    active: number;
+    approaching: number;
+    completed: number;
+  };
+}) {
+  return (
+    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <StatBlock
+        cardClass="border-[#5f34b0] bg-[#5f34b0]"
+        label="全部任务"
+        labelClass="text-white"
+        value={stats.total}
+        valueClass="text-white"
+      />
+      <StatBlock
+        cardClass="border-[#57bfda] bg-[#57bfda]"
+        label="进行中"
+        labelClass="text-white"
+        value={stats.active}
+        valueClass="text-white"
+      />
+      <StatBlock
+        cardClass="border-[#ff0000] bg-[#ff0000]"
+        label="临近截止"
+        labelClass="text-white"
+        value={stats.approaching}
+        valueClass="text-white"
+      />
+      <StatBlock
+        cardClass="border-[#4bae50] bg-[#4bae50]"
+        label="已完成"
+        labelClass="text-white"
+        value={stats.completed}
+        valueClass="text-white"
+      />
+    </section>
+  );
+}
+
+function TaskSidebar({
+  activeAction,
+  onSwitch
+}: {
+  activeAction: WorkspaceAction;
+  onSwitch: (action: WorkspaceAction) => void;
+}) {
+  const [isEditGroupExpanded, setIsEditGroupExpanded] = useState(true);
+
+  return (
+    <aside className="h-full w-72 shrink-0 overflow-y-auto border-r border-[var(--border)] bg-[#171918] px-4 py-5">
+      <nav className="flex flex-col gap-2">
+        <TreeButton
+          active={activeAction === "view"}
+          label="查看任务"
+          onClick={() => onSwitch("view")}
+        />
+
+        <div className="mt-2">
+          <button
+            aria-expanded={isEditGroupExpanded}
+            className={`flex w-full items-center gap-3 rounded-md border px-3 py-3 text-left text-sm font-semibold transition ${
+              activeAction === "view"
+                ? "border-transparent text-[var(--primary)] hover:bg-[var(--muted)]"
+                : "border-[var(--primary)] bg-[#263245] text-[var(--primary)]"
+            }`}
+            onClick={() => setIsEditGroupExpanded((isExpanded) => !isExpanded)}
+            type="button"
+          >
+            <span className="flex-1">任务编辑</span>
+            <span
+              className={`text-xs transition-transform ${
+                isEditGroupExpanded ? "" : "rotate-180"
+              }`}
+            >
+              ▲
+            </span>
+          </button>
+
+          {isEditGroupExpanded ? (
+            <div className="mt-1 flex flex-col gap-1 pl-6">
+              {EDIT_ACTIONS.map((action) => (
+                <TreeButton
+                  active={activeAction === action.id}
+                  key={action.id}
+                  label={action.label}
+                  onClick={() => onSwitch(action.id)}
+                />
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </nav>
+    </aside>
+  );
+}
+
+function TreeButton({
+  active,
+  label,
+  onClick
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      className={`flex w-full items-center gap-3 rounded-md border px-3 py-3 text-left text-sm font-semibold transition ${
+        active
+          ? "border-[var(--primary)] bg-[#263245] text-[var(--primary)]"
+          : "border-transparent text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+      }`}
+      onClick={onClick}
+      type="button"
+    >
+      <span>{label}</span>
+    </button>
   );
 }
 
@@ -569,24 +786,28 @@ function TaskCard({
 
       {mode === "manage" ? (
         <div className="mt-5 flex flex-wrap gap-2">
-          <TaskActionButton onClick={() => onEdit?.(task)}>
-            编辑
-          </TaskActionButton>
-          {task.status !== "ARCHIVED" ? (
+          {onEdit ? (
+            <TaskActionButton onClick={() => onEdit(task)}>
+              编辑
+            </TaskActionButton>
+          ) : null}
+          {onArchive && task.status !== "ARCHIVED" ? (
             <TaskActionButton
               disabled={isBusy}
-              onClick={() => onArchive?.(task.id)}
+              onClick={() => onArchive(task.id)}
             >
               归档
             </TaskActionButton>
           ) : null}
-          <TaskActionButton
-            danger
-            disabled={isBusy}
-            onClick={() => onDelete?.(task.id)}
-          >
-            删除
-          </TaskActionButton>
+          {onDelete ? (
+            <TaskActionButton
+              danger
+              disabled={isBusy}
+              onClick={() => onDelete(task.id)}
+            >
+              删除
+            </TaskActionButton>
+          ) : null}
         </div>
       ) : null}
     </article>
@@ -855,6 +1076,10 @@ function getApiError(data: ApiTaskResponse) {
   }
 
   return data.error || "请求失败。";
+}
+
+function redirectToLogin() {
+  window.location.href = "/login";
 }
 
 function getErrorMessage(error: unknown) {

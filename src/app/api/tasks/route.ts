@@ -1,15 +1,24 @@
 import { NextResponse } from "next/server";
 import { jsonError, validationError } from "@/lib/api-response";
 import { getPrisma } from "@/lib/prisma";
-import { requireManageSession } from "@/lib/task-auth";
+import { requireUserSession } from "@/lib/task-auth";
 import {
   createTaskSchema,
   normalizeOptionalDescription
 } from "@/lib/task-validation";
 
 export async function GET() {
+  const { response, session } = await requireUserSession();
+
+  if (response) {
+    return response;
+  }
+
   const prisma = getPrisma();
   const tasks = await prisma.task.findMany({
+    where: {
+      userId: session.user.id
+    },
     orderBy: [
       {
         status: "asc"
@@ -24,10 +33,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const unauthorizedResponse = await requireManageSession();
+  const { response, session } = await requireUserSession();
 
-  if (unauthorizedResponse) {
-    return unauthorizedResponse;
+  if (response) {
+    return response;
   }
 
   const body = await request.json().catch(() => null);
@@ -40,6 +49,7 @@ export async function POST(request: Request) {
   const prisma = getPrisma();
   const task = await prisma.task.create({
     data: {
+      userId: session.user.id,
       title: parsed.data.title,
       description: normalizeOptionalDescription(parsed.data.description),
       startAt: parsed.data.startAt,

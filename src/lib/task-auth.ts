@@ -1,10 +1,18 @@
 import { jsonError } from "@/lib/api-response";
-import { hasManageSession } from "@/lib/manage-auth";
+import { getCurrentSession } from "@/lib/auth-session";
 
-export async function requireManageSession() {
-  if (await hasManageSession()) {
-    return null;
+export async function requireUserSession() {
+  const session = await getCurrentSession();
+
+  if (!session) {
+    return {
+      session: null,
+      response: jsonError("Login required.", 401)
+    };
   }
 
-  return jsonError("Management session required.", 401);
+  return {
+    session,
+    response: null
+  };
 }

@@ -1,0 +1,23 @@
+import { redirect } from "next/navigation";
+import { getCurrentSession } from "@/lib/auth-session";
+import { LoginForm } from "./login-form";
+
+export default async function LoginPage() {
+  const session = await getCurrentSession();
+
+  if (session) {
+    redirect("/");
+  }
+
+  return (
+    <main className="min-h-[calc(100vh-4rem)] px-5 py-8 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-md rounded-lg border border-[var(--border)] bg-[var(--panel)] p-6">
+        <h1 className="text-3xl font-bold">登录</h1>
+        <p className="mt-3 text-sm leading-6 text-[var(--muted-foreground)]">
+          使用邮箱或用户名进入你的 DDL 工作台。
+        </p>
+        <LoginForm />
+      </section>
+    </main>
+  );
+}

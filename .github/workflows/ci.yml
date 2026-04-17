@@ -12,9 +12,23 @@ jobs:
     name: Lint, Test, Build
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: ddl_reminder
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ddl_reminder"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ddl_reminder
-      APP_PASSWORD: ci-password
       SESSION_SECRET: ci-session-secret
       APP_URL: http://localhost:3000
       SMTP_HOST: smtp.example.com
@@ -22,7 +36,6 @@ jobs:
       SMTP_USER: ci-user
       SMTP_PASS: ci-pass
       MAIL_FROM: DDL Reminder <reminder@example.com>
-      MAIL_TO: you@example.com
       TZ: Asia/Shanghai
 
     steps:
@@ -40,6 +53,9 @@ jobs:
 
       - name: Generate Prisma Client
         run: npm run prisma:generate
+
+      - name: Apply database migrations
+        run: npm run db:migrate
 
       - name: Run ESLint
         run: npm run lint

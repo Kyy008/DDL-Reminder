@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { jsonError, validationError } from "@/lib/api-response";
 import { getPrisma } from "@/lib/prisma";
-import { requireManageSession } from "@/lib/task-auth";
+import { requireUserSession } from "@/lib/task-auth";
 import {
   isValidTaskDateRange,
   normalizeOptionalDescription,
@@ -16,10 +16,10 @@ type RouteContext = {
 };
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const unauthorizedResponse = await requireManageSession();
+  const { response, session } = await requireUserSession();
 
-  if (unauthorizedResponse) {
-    return unauthorizedResponse;
+  if (response) {
+    return response;
   }
 
   const taskId = await parseTaskId(context);
@@ -37,9 +37,10 @@ export async function PATCH(request: Request, context: RouteContext) {
 
   const prisma = getPrisma();
   const existingTask = await prisma.task
-    .findUnique({
+    .findFirst({
       where: {
-        id: taskId
+        id: taskId,
+        userId: session.user.id
       }
     })
     .catch(() => null);
@@ -55,10 +56,11 @@ export async function PATCH(request: Request, context: RouteContext) {
     return jsonError("DDL time must be later than start time.", 400);
   }
 
-  const task = await prisma.task
-    .update({
+  const updateResult = await prisma.task
+    .updateMany({
       where: {
-        id: taskId
+        id: taskId,
+        userId: session.user.id
       },
       data: {
         ...(parsed.data.title !== undefined
@@ -77,18 +79,24 @@ export async function PATCH(request: Request, context: RouteContext) {
     })
     .catch(() => null);
 
-  if (!task) {
+  if (!updateResult?.count) {
     return jsonError("Task not found.", 404);
   }
+
+  const task = await prisma.task.findUnique({
+    where: {
+      id: taskId
+    }
+  });
 
   return NextResponse.json({ task });
 }
 
 export async function DELETE(_request: Request, context: RouteContext) {
-  const unauthorizedResponse = await requireManageSession();
+  const { response, session } = await requireUserSession();
 
-  if (unauthorizedResponse) {
-    return unauthorizedResponse;
+  if (response) {
+    return response;
   }
 
   const taskId = await parseTaskId(context);
@@ -99,14 +107,15 @@ export async function DELETE(_request: Request, context: RouteContext) {
 
   const prisma = getPrisma();
   const task = await prisma.task
-    .delete({
+    .deleteMany({
       where: {
-        id: taskId
+        id: taskId,
+        userId: session.user.id
       }
     })
     .catch(() => null);
 
-  if (!task) {
+  if (!task?.count) {
     return jsonError("Task not found.", 404);
   }
 

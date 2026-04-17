@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { jsonError } from "@/lib/api-response";
 import { getPrisma } from "@/lib/prisma";
-import { requireManageSession } from "@/lib/task-auth";
+import { requireUserSession } from "@/lib/task-auth";
 import { taskIdSchema } from "@/lib/task-validation";
 
 type RouteContext = {
@@ -11,10 +11,10 @@ type RouteContext = {
 };
 
 export async function POST(_request: Request, context: RouteContext) {
-  const unauthorizedResponse = await requireManageSession();
+  const { response, session } = await requireUserSession();
 
-  if (unauthorizedResponse) {
-    return unauthorizedResponse;
+  if (response) {
+    return response;
   }
 
   const params = await context.params;
@@ -25,10 +25,11 @@ export async function POST(_request: Request, context: RouteContext) {
   }
 
   const prisma = getPrisma();
-  const task = await prisma.task
-    .update({
+  const updateResult = await prisma.task
+    .updateMany({
       where: {
-        id: parsed.data
+        id: parsed.data,
+        userId: session.user.id
       },
       data: {
         status: "ARCHIVED"
@@ -36,9 +37,15 @@ export async function POST(_request: Request, context: RouteContext) {
     })
     .catch(() => null);
 
-  if (!task) {
+  if (!updateResult?.count) {
     return jsonError("Task not found.", 404);
   }
+
+  const task = await prisma.task.findUnique({
+    where: {
+      id: parsed.data
+    }
+  });
 
   return NextResponse.json({ task });
 }

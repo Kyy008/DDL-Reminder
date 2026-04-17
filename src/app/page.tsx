@@ -1,9 +1,17 @@
-import { MainTaskWorkspace } from "./main-task-workspace";
+import { redirect } from "next/navigation";
+import { getCurrentSession } from "@/lib/auth-session";
+import { TaskDashboard } from "./task-dashboard";
 
-export default function Home() {
+export default async function Home() {
+  const session = await getCurrentSession();
+
+  if (!session) {
+    redirect("/login");
+  }
+
   return (
     <main className="h-[calc(100vh-4rem)] overflow-hidden">
-      <MainTaskWorkspace />
+      <TaskDashboard mode="manage" />
     </main>
   );
 }

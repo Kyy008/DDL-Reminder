@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { hasManageSession } from "@/lib/manage-auth";
-import { ManageLogoutButton } from "./manage/logout-button";
+import { getCurrentSession } from "@/lib/auth-session";
+import { LogoutButton } from "./logout-button";
 
 export async function TopNav() {
-  const isAuthenticated = await hasManageSession();
+  const session = await getCurrentSession();
 
   return (
     <nav className="fixed inset-x-0 top-0 z-30 border-b border-[var(--border)] bg-[var(--background)]/95 backdrop-blur">
@@ -16,7 +16,29 @@ export async function TopNav() {
         </Link>
 
         <div className="flex items-center gap-3">
-          {isAuthenticated ? <ManageLogoutButton /> : null}
+          {session ? (
+            <>
+              <span className="hidden text-sm font-medium text-[var(--muted-foreground)] sm:inline">
+                {session.user.username}
+              </span>
+              <LogoutButton />
+            </>
+          ) : (
+            <>
+              <Link
+                className="text-sm font-semibold text-[var(--foreground)]"
+                href="/login"
+              >
+                登录
+              </Link>
+              <Link
+                className="rounded-md bg-[var(--primary)] px-4 py-2 text-sm font-semibold text-[var(--primary-foreground)]"
+                href="/register"
+              >
+                注册
+              </Link>
+            </>
+          )}
         </div>
       </div>
     </nav>
