@@ -6,6 +6,7 @@ import {
   normalizeUsername,
   registerSchema
 } from "./auth-validation";
+import { AUTH_ERROR_MESSAGES } from "./auth-error-messages";
 
 describe("registerSchema", () => {
   it("normalizes email and trims username", () => {
@@ -31,9 +32,25 @@ describe("registerSchema", () => {
     });
 
     expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toBe(
+        AUTH_ERROR_MESSAGES.emailInvalid
+      );
+    }
   });
 
-  it("rejects short passwords", () => {
+  it("accepts six-character passwords", () => {
+    const result = registerSchema.safeParse({
+      username: "kyy008",
+      email: "kyy008@example.com",
+      password: "123456"
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects passwords shorter than six characters", () => {
     const result = registerSchema.safeParse({
       username: "kyy008",
       email: "kyy008@example.com",
@@ -41,6 +58,12 @@ describe("registerSchema", () => {
     });
 
     expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toBe(
+        AUTH_ERROR_MESSAGES.passwordTooShort
+      );
+    }
   });
 
   it("rejects unsupported username characters", () => {
@@ -51,6 +74,12 @@ describe("registerSchema", () => {
     });
 
     expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toBe(
+        AUTH_ERROR_MESSAGES.usernameInvalid
+      );
+    }
   });
 });
 
@@ -71,18 +100,29 @@ describe("loginSchema", () => {
   });
 
   it("rejects empty values", () => {
-    expect(
-      loginSchema.safeParse({
-        identifier: "",
-        password: "password123"
-      }).success
-    ).toBe(false);
-    expect(
-      loginSchema.safeParse({
-        identifier: "kyy008",
-        password: ""
-      }).success
-    ).toBe(false);
+    const emptyIdentifier = loginSchema.safeParse({
+      identifier: "",
+      password: "password123"
+    });
+    const emptyPassword = loginSchema.safeParse({
+      identifier: "kyy008",
+      password: ""
+    });
+
+    expect(emptyIdentifier.success).toBe(false);
+    expect(emptyPassword.success).toBe(false);
+
+    if (!emptyIdentifier.success) {
+      expect(emptyIdentifier.error.issues[0]?.message).toBe(
+        AUTH_ERROR_MESSAGES.identifierRequired
+      );
+    }
+
+    if (!emptyPassword.success) {
+      expect(emptyPassword.error.issues[0]?.message).toBe(
+        AUTH_ERROR_MESSAGES.passwordRequired
+      );
+    }
   });
 });
 

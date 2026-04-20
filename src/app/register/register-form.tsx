@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
+import { AUTH_ERROR_MESSAGES } from "@/lib/auth-error-messages";
 
 type RegisterResponse = {
   error?: string;
@@ -21,9 +22,16 @@ export function RegisterForm() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    setIsSubmitting(true);
+
+    const validationMessage = validateRegisterForm(username, email, password);
+
+    if (validationMessage) {
+      setError(validationMessage);
+      return;
+    }
 
     try {
+      setIsSubmitting(true);
       const response = await fetch("/api/auth/register", {
         method: "POST",
         headers: {
@@ -67,7 +75,11 @@ export function RegisterForm() {
   }
 
   return (
-    <form className="mt-6 flex flex-col gap-4" onSubmit={handleSubmit}>
+    <form
+      className="mt-6 flex flex-col gap-4"
+      noValidate
+      onSubmit={handleSubmit}
+    >
       <label className="flex flex-col gap-2 text-sm font-medium">
         用户名
         <input
@@ -94,7 +106,7 @@ export function RegisterForm() {
         <input
           autoComplete="new-password"
           className="h-11 rounded-md border border-[var(--border)] bg-[var(--field)] px-3 text-base text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
-          minLength={8}
+          minLength={6}
           onChange={(event) => setPassword(event.target.value)}
           required
           type="password"
@@ -117,4 +129,51 @@ export function RegisterForm() {
       </p>
     </form>
   );
+}
+
+function validateRegisterForm(username: string, email: string, password: string) {
+  const trimmedUsername = username.trim();
+  const trimmedEmail = email.trim();
+
+  if (trimmedUsername.length === 0) {
+    return AUTH_ERROR_MESSAGES.usernameRequired;
+  }
+
+  if (trimmedUsername.length < 3) {
+    return AUTH_ERROR_MESSAGES.usernameTooShort;
+  }
+
+  if (trimmedUsername.length > 32) {
+    return AUTH_ERROR_MESSAGES.usernameTooLong;
+  }
+
+  if (!/^[A-Za-z0-9_]+$/.test(trimmedUsername)) {
+    return AUTH_ERROR_MESSAGES.usernameInvalid;
+  }
+
+  if (trimmedEmail.length === 0) {
+    return AUTH_ERROR_MESSAGES.emailRequired;
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+    return AUTH_ERROR_MESSAGES.emailInvalid;
+  }
+
+  if (trimmedEmail.length > 254) {
+    return AUTH_ERROR_MESSAGES.emailTooLong;
+  }
+
+  if (password.length === 0) {
+    return AUTH_ERROR_MESSAGES.passwordRequired;
+  }
+
+  if (password.length < 6) {
+    return AUTH_ERROR_MESSAGES.passwordTooShort;
+  }
+
+  if (password.length > 128) {
+    return AUTH_ERROR_MESSAGES.passwordTooLong;
+  }
+
+  return "";
 }

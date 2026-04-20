@@ -2,9 +2,13 @@
 
 import Link from "next/link";
 import { FormEvent, useState } from "react";
+import { AUTH_ERROR_MESSAGES } from "@/lib/auth-error-messages";
 
 type LoginResponse = {
   error?: string;
+  issues?: Array<{
+    message: string;
+  }>;
 };
 
 export function LoginForm() {
@@ -16,9 +20,16 @@ export function LoginForm() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    setIsSubmitting(true);
+
+    const validationMessage = validateLoginForm(identifier, password);
+
+    if (validationMessage) {
+      setError(validationMessage);
+      return;
+    }
 
     try {
+      setIsSubmitting(true);
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
@@ -29,7 +40,9 @@ export function LoginForm() {
       const payload = (await response.json()) as LoginResponse;
 
       if (!response.ok) {
-        throw new Error(payload.error || "登录失败。");
+        throw new Error(
+          payload.issues?.[0]?.message || payload.error || "登录失败。"
+        );
       }
 
       window.location.href = "/";
@@ -40,7 +53,11 @@ export function LoginForm() {
   }
 
   return (
-    <form className="mt-6 flex flex-col gap-4" onSubmit={handleSubmit}>
+    <form
+      className="mt-6 flex flex-col gap-4"
+      noValidate
+      onSubmit={handleSubmit}
+    >
       <label className="flex flex-col gap-2 text-sm font-medium">
         邮箱或用户名
         <input
@@ -78,4 +95,16 @@ export function LoginForm() {
       </p>
     </form>
   );
+}
+
+function validateLoginForm(identifier: string, password: string) {
+  if (identifier.trim().length === 0) {
+    return AUTH_ERROR_MESSAGES.identifierRequired;
+  }
+
+  if (password.length === 0) {
+    return AUTH_ERROR_MESSAGES.passwordRequired;
+  }
+
+  return "";
 }

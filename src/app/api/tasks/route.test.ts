@@ -112,7 +112,7 @@ describe("tasks route", () => {
 
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toMatchObject({
-      error: "Invalid request."
+      error: "请求参数无效。"
     });
     expect(mocks.prisma.task.create).not.toHaveBeenCalled();
   });

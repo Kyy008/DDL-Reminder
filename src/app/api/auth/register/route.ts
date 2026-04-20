@@ -4,6 +4,7 @@ import { hashPassword } from "@/lib/auth-crypto";
 import { isUniqueConstraintError } from "@/lib/auth-errors";
 import { registerSchema } from "@/lib/auth-validation";
 import { jsonError, validationError } from "@/lib/api-response";
+import { AUTH_ERROR_MESSAGES } from "@/lib/auth-error-messages";
 import { sendActivationEmail } from "@/lib/mailer";
 import { getPrisma } from "@/lib/prisma";
 
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
     });
 
   if (!user) {
-    return jsonError("Email or username is already registered.", 409);
+    return jsonError(AUTH_ERROR_MESSAGES.duplicateAccount, 409);
   }
 
   const activation = await createEmailVerificationToken(user.id);
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
       username: user.username
     });
   } catch {
-    return jsonError("Failed to send activation email.", 500);
+    return jsonError(AUTH_ERROR_MESSAGES.activationEmailFailed, 500);
   }
 
   return NextResponse.json(

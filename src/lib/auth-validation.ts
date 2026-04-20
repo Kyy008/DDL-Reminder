@@ -1,26 +1,27 @@
 import { z } from "zod";
+import { AUTH_ERROR_MESSAGES } from "./auth-error-messages";
 
 const usernameSchema = z
   .string()
   .trim()
-  .min(3, "Username must be at least 3 characters.")
-  .max(32, "Username must be at most 32 characters.")
-  .regex(
-    /^[A-Za-z0-9_]+$/,
-    "Username can only contain letters, numbers, and underscores."
-  );
+  .min(1, AUTH_ERROR_MESSAGES.usernameRequired)
+  .min(3, AUTH_ERROR_MESSAGES.usernameTooShort)
+  .max(32, AUTH_ERROR_MESSAGES.usernameTooLong)
+  .regex(/^[A-Za-z0-9_]+$/, AUTH_ERROR_MESSAGES.usernameInvalid);
 
 const emailSchema = z
   .string()
   .trim()
-  .email("Email must be valid.")
-  .max(254, "Email is too long.")
+  .min(1, AUTH_ERROR_MESSAGES.emailRequired)
+  .email(AUTH_ERROR_MESSAGES.emailInvalid)
+  .max(254, AUTH_ERROR_MESSAGES.emailTooLong)
   .transform((email) => normalizeEmail(email));
 
 const passwordSchema = z
   .string()
-  .min(8, "Password must be at least 8 characters.")
-  .max(128, "Password must be at most 128 characters.");
+  .min(1, AUTH_ERROR_MESSAGES.passwordRequired)
+  .min(6, AUTH_ERROR_MESSAGES.passwordTooShort)
+  .max(128, AUTH_ERROR_MESSAGES.passwordTooLong);
 
 export const registerSchema = z.object({
   username: usernameSchema,
@@ -29,8 +30,8 @@ export const registerSchema = z.object({
 });
 
 export const loginSchema = z.object({
-  identifier: z.string().trim().min(1, "Email or username is required."),
-  password: z.string().min(1, "Password is required.")
+  identifier: z.string().trim().min(1, AUTH_ERROR_MESSAGES.identifierRequired),
+  password: z.string().min(1, AUTH_ERROR_MESSAGES.passwordRequired)
 });
 
 export function normalizeEmail(email: string) {

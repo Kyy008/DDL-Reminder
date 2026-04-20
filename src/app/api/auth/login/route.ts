@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth-validation";
 import { verifyPassword } from "@/lib/auth-crypto";
 import { jsonError, validationError } from "@/lib/api-response";
+import { AUTH_ERROR_MESSAGES } from "@/lib/auth-error-messages";
 import { getPrisma } from "@/lib/prisma";
 
 export async function POST(request: Request) {
@@ -33,11 +34,11 @@ export async function POST(request: Request) {
     !user ||
     !(await verifyPassword(parsed.data.password, user.passwordHash))
   ) {
-    return jsonError("Invalid credentials.", 401);
+    return jsonError(AUTH_ERROR_MESSAGES.invalidCredentials, 401);
   }
 
   if (!user.emailVerifiedAt) {
-    return jsonError("Please activate your email before logging in.", 403);
+    return jsonError(AUTH_ERROR_MESSAGES.emailNotActivated, 403);
   }
 
   const { cookie } = await createSession(user.id);
