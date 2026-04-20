@@ -1,7 +1,7 @@
 "use client";
 
 import type { FormEvent, ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   calculateDeadlineProgress,
   DeadlineStatus,
@@ -127,6 +127,10 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
   const [activeAction, setActiveAction] = useState<WorkspaceAction>("view");
   const [form, setForm] = useState<TaskFormState>(() => createEmptyForm());
   const [now, setNow] = useState(() => new Date());
+  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(
+    null
+  );
+  const pendingFocusTaskId = useRef<string | null>(null);
 
   const loadTasks = useCallback(async () => {
     setError(null);
@@ -189,12 +193,64 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
     };
   }, [visibleTasks]);
 
+  useEffect(() => {
+    const taskId = pendingFocusTaskId.current;
+
+    if (!taskId || activeAction !== "view") {
+      return;
+    }
+
+    const taskIsVisible = visibleTasks.some((task) => task.id === taskId);
+
+    if (!taskIsVisible) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      const target = document.querySelector<HTMLElement>(
+        `[data-task-card-id="${taskId}"]`
+      );
+
+      if (!target) {
+        return;
+      }
+
+      target.scrollIntoView({
+        behavior: "smooth",
+        block: "center"
+      });
+      setHighlightedTaskId(taskId);
+      pendingFocusTaskId.current = null;
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, [activeAction, visibleTasks]);
+
+  useEffect(() => {
+    if (!highlightedTaskId) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setHighlightedTaskId((currentTaskId) =>
+        currentTaskId === highlightedTaskId ? null : currentTaskId
+      );
+    }, 1800);
+
+    return () => {
+      window.clearTimeout(timeout);
+    };
+  }, [highlightedTaskId]);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setIsSubmitting(true);
     setError(null);
 
     try {
+      const isCreatingTask = editingTaskId === null;
       const payload = formToPayload(form);
       const endpoint = editingTaskId
         ? `/api/tasks/${editingTaskId}`
@@ -221,6 +277,12 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
 
       setTasks((currentTasks) => upsertTask(currentTasks, savedTask));
       resetForm();
+
+      if (isCreatingTask) {
+        pendingFocusTaskId.current = savedTask.id;
+        setHighlightedTaskId(null);
+        setActiveAction("view");
+      }
     } catch (submitError) {
       setError(getErrorMessage(submitError));
     } finally {
@@ -319,6 +381,7 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
             <TaskList
               busyTaskId={busyTaskId}
               isLoading={isLoading}
+              highlightedTaskId={highlightedTaskId}
               mode="public"
               onComplete={(taskId) =>
                 runTaskAction(taskId, `/api/tasks/${taskId}/complete`, "POST")
@@ -371,15 +434,9 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
                 busyTaskId={busyTaskId}
                 isLoading={isLoading}
                 mode="manage"
-                onDelete={(taskId) => {
-                  if (window.confirm("确认删除这个任务吗？")) {
-                    void runTaskAction(
-                      taskId,
-                      `/api/tasks/${taskId}`,
-                      "DELETE"
-                    );
-                  }
-                }}
+                onDelete={(taskId) =>
+                  void runTaskAction(taskId, `/api/tasks/${taskId}`, "DELETE")
+                }
                 tasks={visibleTasks}
               />
             </section>
@@ -632,6 +689,7 @@ function TreeButton({
 
 function TaskList({
   busyTaskId,
+  highlightedTaskId,
   isLoading,
   mode,
   onArchive,
@@ -641,6 +699,7 @@ function TaskList({
   tasks
 }: {
   busyTaskId: string | null;
+  highlightedTaskId?: string | null;
   isLoading: boolean;
   mode: "public" | "manage";
   onArchive?: (taskId: string) => void;
@@ -678,6 +737,7 @@ function TaskList({
       {tasks.map((task) => (
         <TaskCard
           busyTaskId={busyTaskId}
+          isHighlighted={highlightedTaskId === task.id}
           key={task.id}
           mode={mode}
           onArchive={onArchive}
@@ -693,6 +753,7 @@ function TaskList({
 
 function TaskCard({
   busyTaskId,
+  isHighlighted = false,
   mode,
   onArchive,
   onComplete,
@@ -701,6 +762,7 @@ function TaskCard({
   task
 }: {
   busyTaskId: string | null;
+  isHighlighted?: boolean;
   mode: "public" | "manage";
   onArchive?: (taskId: string) => void;
   onComplete?: (taskId: string) => void;
@@ -711,9 +773,15 @@ function TaskCard({
   const meta = STATUS_META[task.deadlineStatus];
   const isBusy = busyTaskId === task.id;
   const isCompleted = task.status === "COMPLETED";
+  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
 
   return (
-    <article className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5">
+    <article
+      className={`rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5 ${
+        isHighlighted ? "task-card-success-flash" : ""
+      }`}
+      data-task-card-id={task.id}
+    >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-3">
@@ -788,11 +856,28 @@ function TaskCard({
               归档
             </TaskActionButton>
           ) : null}
-          {onDelete ? (
+          {onDelete && isConfirmingDelete ? (
+            <>
+              <TaskActionButton
+                disabled={isBusy}
+                onClick={() => setIsConfirmingDelete(false)}
+              >
+                取消
+              </TaskActionButton>
+              <TaskActionButton
+                danger
+                disabled={isBusy}
+                onClick={() => onDelete(task.id)}
+              >
+                {isBusy ? "删除中..." : "确认删除"}
+              </TaskActionButton>
+            </>
+          ) : null}
+          {onDelete && !isConfirmingDelete ? (
             <TaskActionButton
               danger
               disabled={isBusy}
-              onClick={() => onDelete(task.id)}
+              onClick={() => setIsConfirmingDelete(true)}
             >
               删除
             </TaskActionButton>

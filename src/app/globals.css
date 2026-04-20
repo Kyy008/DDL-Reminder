@@ -48,3 +48,40 @@ a {
   color: #777f70;
   opacity: 1;
 }
+
+@keyframes task-card-success-flash {
+  0%,
+  100% {
+    border-color: var(--border);
+    background-color: var(--panel);
+    box-shadow: none;
+  }
+
+  15%,
+  45% {
+    border-color: #4bae50;
+    background-color: rgba(75, 174, 80, 0.16);
+    box-shadow:
+      0 0 0 2px rgba(75, 174, 80, 0.35),
+      0 0 28px rgba(75, 174, 80, 0.22);
+  }
+
+  30%,
+  60% {
+    border-color: var(--border);
+    background-color: var(--panel);
+    box-shadow: none;
+  }
+}
+
+.task-card-success-flash {
+  animation: task-card-success-flash 1.6s ease-in-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-card-success-flash {
+    animation: none;
+    border-color: #4bae50;
+    box-shadow: 0 0 0 2px rgba(75, 174, 80, 0.35);
+  }
+}
