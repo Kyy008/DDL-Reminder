@@ -1,0 +1,17 @@
+.git
+.github
+.next
+coverage
+data
+dist
+node_modules
+out
+src/generated/prisma
+
+.env
+.env.*
+*.log
+.DS_Store
+
+Dockerfile
+docker-compose.yml
