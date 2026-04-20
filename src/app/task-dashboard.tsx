@@ -192,13 +192,13 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
 
   const stats = useMemo(() => {
     return {
-      total: visibleTasks.length,
-      active: visibleTasks.filter((task) => task.status === "ACTIVE").length,
+      normal: visibleTasks.filter((task) => task.deadlineStatus === "normal")
+        .length,
       approaching: visibleTasks.filter(
-        (task) =>
-          task.deadlineStatus === "approaching" ||
-          task.deadlineStatus === "urgent"
+        (task) => task.deadlineStatus === "approaching"
       ).length,
+      urgent: visibleTasks.filter((task) => task.deadlineStatus === "urgent")
+        .length,
       completed: visibleTasks.filter((task) => task.status === "COMPLETED")
         .length
     };
@@ -577,33 +577,33 @@ function StatsSection({
   stats
 }: {
   stats: {
-    total: number;
-    active: number;
+    normal: number;
     approaching: number;
+    urgent: number;
     completed: number;
   };
 }) {
   return (
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       <StatBlock
-        cardClass="border-[#5f34b0] bg-[#5f34b0]"
-        label="全部任务"
-        labelClass="text-white"
-        value={stats.total}
-        valueClass="text-white"
-      />
-      <StatBlock
         cardClass="border-[#57bfda] bg-[#57bfda]"
         label="进行中"
         labelClass="text-white"
-        value={stats.active}
+        value={stats.normal}
+        valueClass="text-white"
+      />
+      <StatBlock
+        cardClass="border-[#f5c84c] bg-[#f5c84c]"
+        label="临近截止"
+        labelClass="text-white"
+        value={stats.approaching}
         valueClass="text-white"
       />
       <StatBlock
         cardClass="border-[#ff0000] bg-[#ff0000]"
-        label="临近截止"
+        label="即将截止"
         labelClass="text-white"
-        value={stats.approaching}
+        value={stats.urgent}
         valueClass="text-white"
       />
       <StatBlock
