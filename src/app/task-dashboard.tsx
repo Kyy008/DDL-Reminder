@@ -5,8 +5,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   calculateDeadlineProgress,
   DeadlineStatus,
+  DEFAULT_APPROACHING_THRESHOLD_MS,
+  DEFAULT_URGENT_THRESHOLD_MS,
   getDeadlineStatus,
-  getRemainingTimeParts
+  getRemainingTimeParts,
+  HOUR_MS
 } from "@/lib/deadline";
 import { TaskStatusValue } from "@/lib/task-constants";
 
@@ -39,6 +42,17 @@ type TaskFormState = {
   dueAt: string;
 };
 
+type ReminderSettings = {
+  emailReminderEnabled: boolean;
+  approachingHours: number;
+  deadlineHours: number;
+};
+
+type ReminderThresholds = {
+  approachingThresholdMs: number;
+  urgentThresholdMs: number;
+};
+
 type ApiTaskResponse = {
   task?: TaskDto;
   tasks?: TaskDto[];
@@ -48,8 +62,14 @@ type ApiTaskResponse = {
   }>;
 };
 
-type WorkspaceAction = "view" | "add" | "edit";
-type SidebarIconName = "add" | "collapse" | "edit" | "group" | "view";
+type WorkspaceAction = "view" | "add" | "edit" | "settings";
+type SidebarIconName =
+  | "add"
+  | "collapse"
+  | "edit"
+  | "group"
+  | "settings"
+  | "view";
 
 const EMPTY_FORM = {
   hasDeadline: true,
@@ -59,8 +79,14 @@ const EMPTY_FORM = {
   dueAt: ""
 };
 
+const DEFAULT_REMINDER_SETTINGS: ReminderSettings = {
+  emailReminderEnabled: true,
+  approachingHours: DEFAULT_APPROACHING_THRESHOLD_MS / HOUR_MS,
+  deadlineHours: DEFAULT_URGENT_THRESHOLD_MS / HOUR_MS
+};
+
 const EDIT_ACTIONS: Array<{
-  id: Exclude<WorkspaceAction, "view">;
+  id: Extract<WorkspaceAction, "add" | "edit">;
   icon: SidebarIconName;
   label: string;
 }> = [
@@ -129,6 +155,9 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [activeAction, setActiveAction] = useState<WorkspaceAction>("view");
   const [form, setForm] = useState<TaskFormState>(() => createEmptyForm());
+  const [reminderSettings, setReminderSettings] = useState<ReminderSettings>(
+    DEFAULT_REMINDER_SETTINGS
+  );
   const [now, setNow] = useState(() => new Date());
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(
     null
@@ -185,12 +214,17 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
     };
   }, []);
 
+  const reminderThresholds = useMemo(
+    () => toReminderThresholds(reminderSettings),
+    [reminderSettings]
+  );
+
   const visibleTasks = useMemo(() => {
     return tasks
-      .map((task) => toTaskView(task, now))
+      .map((task) => toTaskView(task, now, reminderThresholds))
       .filter((task) => isManageMode || task.status !== "ARCHIVED")
       .sort(compareTaskViews);
-  }, [isManageMode, now, tasks]);
+  }, [isManageMode, now, reminderThresholds, tasks]);
 
   const stats = useMemo(() => {
     return {
@@ -468,6 +502,13 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
                 </section>
               ) : null}
             </section>
+          ) : null}
+
+          {activeAction === "settings" ? (
+            <SettingsPanel
+              settings={reminderSettings}
+              onChange={setReminderSettings}
+            />
           ) : null}
 
           {error ? (
@@ -758,6 +799,16 @@ function TaskSidebar({
           ) : null}
         </div>
       </nav>
+
+      <div className="mt-4 border-t border-[var(--border)] pt-4">
+        <TreeButton
+          active={activeAction === "settings"}
+          icon="settings"
+          label="设置"
+          collapsed={isCollapsed}
+          onClick={() => onSwitch("settings")}
+        />
+      </div>
     </aside>
   );
 }
@@ -855,10 +906,127 @@ function SidebarIcon({
     );
   }
 
+  if (name === "settings") {
+    return (
+      <svg {...commonProps}>
+        <path d="M12 15.5A3.5 3.5 0 1 0 12 8a3.5 3.5 0 0 0 0 7.5Z" />
+        <path d="M19.4 15a1.8 1.8 0 0 0 .36 1.98l.05.05a2 2 0 1 1-2.83 2.83l-.05-.05a1.8 1.8 0 0 0-1.98-.36 1.8 1.8 0 0 0-1.1 1.65V21a2 2 0 1 1-4 0v-.08a1.8 1.8 0 0 0-1.1-1.65 1.8 1.8 0 0 0-1.98.36l-.05.05a2 2 0 1 1-2.83-2.83l.05-.05A1.8 1.8 0 0 0 4.3 15a1.8 1.8 0 0 0-1.65-1.1H2.6a2 2 0 1 1 0-4h.08A1.8 1.8 0 0 0 4.33 8.8a1.8 1.8 0 0 0-.36-1.98l-.05-.05a2 2 0 1 1 2.83-2.83l.05.05a1.8 1.8 0 0 0 1.98.36 1.8 1.8 0 0 0 1.1-1.65V2.6a2 2 0 1 1 4 0v.08a1.8 1.8 0 0 0 1.1 1.65 1.8 1.8 0 0 0 1.98-.36l.05-.05a2 2 0 1 1 2.83 2.83l-.05.05a1.8 1.8 0 0 0-.36 1.98 1.8 1.8 0 0 0 1.65 1.1h.08a2 2 0 1 1 0 4h-.08A1.8 1.8 0 0 0 19.4 15Z" />
+      </svg>
+    );
+  }
+
   return (
     <svg {...commonProps}>
       <path d="M15 6 9 12l6 6" />
     </svg>
+  );
+}
+
+function SettingsPanel({
+  onChange,
+  settings
+}: {
+  onChange: (
+    update: (currentSettings: ReminderSettings) => ReminderSettings
+  ) => void;
+  settings: ReminderSettings;
+}) {
+  return (
+    <section className="max-w-3xl rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5">
+      <div className="mb-2 flex items-center justify-between gap-4">
+        <h1 className="text-2xl font-semibold">设置</h1>
+      </div>
+
+      <div className="divide-y divide-[var(--border)]">
+        <div className="flex items-center justify-between gap-4 py-4">
+          <span className="text-sm font-semibold">邮件提醒</span>
+          <button
+            aria-checked={settings.emailReminderEnabled}
+            aria-label="是否邮件提醒"
+            className={`relative h-7 w-12 rounded-full border transition ${
+              settings.emailReminderEnabled
+                ? "border-[var(--primary)] bg-[var(--primary)]"
+                : "border-[var(--border)] bg-[var(--muted)]"
+            }`}
+            onClick={() =>
+              onChange((currentSettings) => ({
+                ...currentSettings,
+                emailReminderEnabled: !currentSettings.emailReminderEnabled
+              }))
+            }
+            role="switch"
+            type="button"
+          >
+            <span
+              className={`absolute left-1 top-1 size-5 rounded-full bg-[var(--background)] transition-transform ${
+                settings.emailReminderEnabled
+                  ? "translate-x-5"
+                  : "translate-x-0"
+              }`}
+            />
+          </button>
+        </div>
+
+        <div className="grid gap-4 py-4 sm:grid-cols-2">
+          <SettingsNumberInput
+            label="临近时间"
+            value={settings.approachingHours}
+            onChange={(nextHours) =>
+              onChange((currentSettings) => ({
+                ...currentSettings,
+                approachingHours: Math.max(
+                  nextHours,
+                  currentSettings.deadlineHours
+                )
+              }))
+            }
+          />
+          <SettingsNumberInput
+            label="截止时间"
+            value={settings.deadlineHours}
+            onChange={(nextHours) =>
+              onChange((currentSettings) => ({
+                ...currentSettings,
+                approachingHours: Math.max(
+                  currentSettings.approachingHours,
+                  nextHours
+                ),
+                deadlineHours: nextHours
+              }))
+            }
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SettingsNumberInput({
+  label,
+  onChange,
+  value
+}: {
+  label: string;
+  onChange: (value: number) => void;
+  value: number;
+}) {
+  return (
+    <label className="flex flex-col gap-2 text-sm font-medium">
+      {label}
+      <div className="relative">
+        <input
+          className="h-11 w-full rounded-md border border-[var(--border)] bg-[var(--field)] px-3 pr-14 text-base text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
+          min={1}
+          onChange={(event) => onChange(parseSettingsHours(event.target.value))}
+          step={1}
+          type="number"
+          value={value}
+        />
+        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-[var(--muted-foreground)]">
+          小时
+        </span>
+      </div>
+    </label>
   );
 }
 
@@ -1144,7 +1312,11 @@ function TaskActionButton({
   );
 }
 
-function toTaskView(task: TaskDto, now: Date): TaskView {
+function toTaskView(
+  task: TaskDto,
+  now: Date,
+  reminderThresholds: ReminderThresholds
+): TaskView {
   const status = toTaskStatus(task.status);
   const hasDeadline = Boolean(task.startAt && task.dueAt);
   const startDate = task.startAt ? new Date(task.startAt) : null;
@@ -1154,7 +1326,9 @@ function toTaskView(task: TaskDto, now: Date): TaskView {
       ? getDeadlineStatus({
           taskStatus: status,
           dueAt: dueDate,
-          now
+          now,
+          approachingThresholdMs: reminderThresholds.approachingThresholdMs,
+          urgentThresholdMs: reminderThresholds.urgentThresholdMs
         })
       : getTaskStatusWithoutDeadline(status);
 
@@ -1334,6 +1508,26 @@ function createDefaultDeadlineFields() {
   return {
     startAt: toDatetimeLocalValue(startAt),
     dueAt: toDatetimeLocalValue(dueAt)
+  };
+}
+
+function parseSettingsHours(value: string) {
+  const parsedValue = Number.parseInt(value, 10);
+
+  if (!Number.isFinite(parsedValue)) {
+    return 1;
+  }
+
+  return Math.max(1, parsedValue);
+}
+
+function toReminderThresholds(settings: ReminderSettings): ReminderThresholds {
+  const urgentHours = Math.max(1, settings.deadlineHours);
+  const approachingHours = Math.max(urgentHours, settings.approachingHours);
+
+  return {
+    approachingThresholdMs: approachingHours * HOUR_MS,
+    urgentThresholdMs: urgentHours * HOUR_MS
   };
 }
 
