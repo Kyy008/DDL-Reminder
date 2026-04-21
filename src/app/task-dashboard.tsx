@@ -195,6 +195,8 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
         .length
     };
   }, [visibleTasks]);
+  const hasVisibleTasks = visibleTasks.length > 0;
+  const shouldShowTaskList = isLoading || hasVisibleTasks;
 
   useEffect(() => {
     const taskId = pendingFocusTaskId.current;
@@ -409,20 +411,26 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
                   submittingLabel="添加中..."
                 />
               </section>
-              <section className="min-w-0">
-                <TaskList
-                  busyTaskId={busyTaskId}
-                  isLoading={isLoading}
-                  layout="single"
-                  mode="public"
-                  tasks={visibleTasks}
-                />
-              </section>
+              {shouldShowTaskList ? (
+                <section className="min-w-0">
+                  <TaskList
+                    busyTaskId={busyTaskId}
+                    isLoading={isLoading}
+                    layout="single"
+                    mode="public"
+                    tasks={visibleTasks}
+                  />
+                </section>
+              ) : null}
             </section>
           ) : null}
 
           {activeAction === "edit" ? (
-            <section className="grid gap-6 xl:grid-cols-2">
+            <section
+              className={`grid gap-6 ${
+                hasVisibleTasks ? "xl:grid-cols-2" : ""
+              }`}
+            >
               {editingTaskId ? (
                 <section className="min-w-0">
                   <TaskEditorForm
@@ -437,16 +445,18 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
               ) : (
                 <section className="min-w-0" />
               )}
-              <section className="min-w-0">
-                <TaskList
-                  busyTaskId={busyTaskId}
-                  isLoading={isLoading}
-                  layout="single"
-                  mode="manage"
-                  onEdit={startEditing}
-                  tasks={visibleTasks}
-                />
-              </section>
+              {shouldShowTaskList ? (
+                <section className="min-w-0">
+                  <TaskList
+                    busyTaskId={busyTaskId}
+                    isLoading={isLoading}
+                    layout="single"
+                    mode="manage"
+                    onEdit={startEditing}
+                    tasks={visibleTasks}
+                  />
+                </section>
+              ) : null}
             </section>
           ) : null}
 
@@ -877,16 +887,7 @@ function TaskList({
   }
 
   if (tasks.length === 0) {
-    return (
-      <section className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--panel)] p-8 text-center">
-        <p className="text-lg font-semibold">还没有任务</p>
-        <p className="mt-2 text-sm text-[var(--muted-foreground)]">
-          {mode === "manage"
-            ? "从左侧添加第一个 DDL。"
-            : "管理区添加任务后，这里会显示剩余时间和进度。"}
-        </p>
-      </section>
-    );
+    return null;
   }
 
   return (
