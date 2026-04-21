@@ -48,14 +48,8 @@ type ApiTaskResponse = {
   }>;
 };
 
-type WorkspaceAction = "view" | "add" | "edit" | "delete";
-type SidebarIconName =
-  | "add"
-  | "collapse"
-  | "delete"
-  | "edit"
-  | "group"
-  | "view";
+type WorkspaceAction = "view" | "add" | "edit";
+type SidebarIconName = "add" | "collapse" | "edit" | "group" | "view";
 
 const EMPTY_FORM = {
   hasDeadline: true,
@@ -79,11 +73,6 @@ const EDIT_ACTIONS: Array<{
     id: "edit",
     icon: "edit",
     label: "编辑任务"
-  },
-  {
-    id: "delete",
-    icon: "delete",
-    label: "删除任务"
   }
 ];
 
@@ -401,35 +390,41 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
               onComplete={(taskId) =>
                 runTaskAction(taskId, `/api/tasks/${taskId}/complete`, "POST")
               }
+              onDelete={(taskId) =>
+                void runTaskAction(taskId, `/api/tasks/${taskId}`, "DELETE")
+              }
               tasks={visibleTasks}
             />
           ) : null}
 
           {activeAction === "add" ? (
-            <section className="max-w-3xl">
-              <TaskEditorForm
-                form={form}
-                isSubmitting={isSubmitting}
-                onChange={setForm}
-                onSubmit={handleSubmit}
-                submitLabel="添加任务"
-                submittingLabel="添加中..."
-              />
+            <section className="grid gap-6 xl:grid-cols-2">
+              <section className="min-w-0">
+                <TaskEditorForm
+                  form={form}
+                  isSubmitting={isSubmitting}
+                  onChange={setForm}
+                  onSubmit={handleSubmit}
+                  submitLabel="添加任务"
+                  submittingLabel="添加中..."
+                />
+              </section>
+              <section className="min-w-0">
+                <TaskList
+                  busyTaskId={busyTaskId}
+                  isLoading={isLoading}
+                  layout="single"
+                  mode="public"
+                  tasks={visibleTasks}
+                />
+              </section>
             </section>
           ) : null}
 
           {activeAction === "edit" ? (
-            <section className="grid gap-6 xl:grid-cols-[minmax(340px,0.75fr)_1.25fr]">
-              <TaskList
-                busyTaskId={busyTaskId}
-                isLoading={isLoading}
-                mode="manage"
-                onEdit={startEditing}
-                tasks={visibleTasks}
-              />
+            <section className="grid gap-6 xl:grid-cols-2">
               {editingTaskId ? (
-                <section>
-                  <TaskEditorHeader eyebrow="编辑任务" title="调整 DDL 信息" />
+                <section className="min-w-0">
                   <TaskEditorForm
                     form={form}
                     isSubmitting={isSubmitting}
@@ -439,21 +434,19 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
                     submittingLabel="保存中..."
                   />
                 </section>
-              ) : null}
-            </section>
-          ) : null}
-
-          {activeAction === "delete" ? (
-            <section>
-              <TaskList
-                busyTaskId={busyTaskId}
-                isLoading={isLoading}
-                mode="manage"
-                onDelete={(taskId) =>
-                  void runTaskAction(taskId, `/api/tasks/${taskId}`, "DELETE")
-                }
-                tasks={visibleTasks}
-              />
+              ) : (
+                <section className="min-w-0" />
+              )}
+              <section className="min-w-0">
+                <TaskList
+                  busyTaskId={busyTaskId}
+                  isLoading={isLoading}
+                  layout="single"
+                  mode="manage"
+                  onEdit={startEditing}
+                  tasks={visibleTasks}
+                />
+              </section>
             </section>
           ) : null}
 
@@ -464,21 +457,6 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
           ) : null}
         </div>
       </section>
-    </div>
-  );
-}
-
-function TaskEditorHeader({
-  eyebrow,
-  title
-}: {
-  eyebrow: string;
-  title: string;
-}) {
-  return (
-    <div className="mb-5 rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5">
-      <p className="text-sm font-semibold text-[var(--primary)]">{eyebrow}</p>
-      <h2 className="mt-2 text-2xl font-semibold">{title}</h2>
     </div>
   );
 }
@@ -857,18 +835,6 @@ function SidebarIcon({
     );
   }
 
-  if (name === "delete") {
-    return (
-      <svg {...commonProps}>
-        <path d="M4 7h16" />
-        <path d="M10 11v6" />
-        <path d="M14 11v6" />
-        <path d="M6 7l1 13h10l1-13" />
-        <path d="M9 7V4h6v3" />
-      </svg>
-    );
-  }
-
   return (
     <svg {...commonProps}>
       <path d="M15 6 9 12l6 6" />
@@ -880,6 +846,7 @@ function TaskList({
   busyTaskId,
   highlightedTaskId,
   isLoading,
+  layout = "grid",
   mode,
   onArchive,
   onComplete,
@@ -890,6 +857,7 @@ function TaskList({
   busyTaskId: string | null;
   highlightedTaskId?: string | null;
   isLoading: boolean;
+  layout?: "grid" | "single";
   mode: "public" | "manage";
   onArchive?: (taskId: string) => void;
   onComplete?: (taskId: string) => void;
@@ -922,7 +890,9 @@ function TaskList({
   }
 
   return (
-    <section className="flex flex-col gap-4">
+    <section
+      className={`grid gap-4 ${layout === "grid" ? "md:grid-cols-2" : ""}`}
+    >
       {tasks.map((task) => (
         <TaskCard
           busyTaskId={busyTaskId}
@@ -989,7 +959,35 @@ function TaskCard({
             </p>
           ) : null}
         </div>
-        <div className="shrink-0 lg:self-start">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 lg:self-start">
+          {onDelete && isConfirmingDelete ? (
+            <>
+              <TaskActionButton
+                disabled={isBusy}
+                onClick={() => setIsConfirmingDelete(false)}
+              >
+                取消
+              </TaskActionButton>
+              <TaskActionButton
+                danger
+                disabled={isBusy}
+                minWidth
+                onClick={() => onDelete(task.id)}
+              >
+                {isBusy ? "删除中..." : "确认删除"}
+              </TaskActionButton>
+            </>
+          ) : null}
+          {onDelete && !isConfirmingDelete ? (
+            <TaskActionButton
+              danger
+              disabled={isBusy}
+              minWidth
+              onClick={() => setIsConfirmingDelete(true)}
+            >
+              删除任务
+            </TaskActionButton>
+          ) : null}
           {isCompleted ? (
             <span
               aria-label="已完成"
@@ -1000,7 +998,7 @@ function TaskCard({
             </span>
           ) : onComplete ? (
             <button
-              className="inline-flex h-10 items-center justify-center rounded-md bg-[#4bae50] px-4 text-sm font-semibold text-white transition hover:bg-[#449b48] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-10 min-w-24 items-center justify-center rounded-md bg-[#4bae50] px-4 text-sm font-semibold text-white transition hover:bg-[#449b48] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={isBusy}
               onClick={() => onComplete(task.id)}
               type="button"
@@ -1049,32 +1047,6 @@ function TaskCard({
               onClick={() => onArchive(task.id)}
             >
               归档
-            </TaskActionButton>
-          ) : null}
-          {onDelete && isConfirmingDelete ? (
-            <>
-              <TaskActionButton
-                disabled={isBusy}
-                onClick={() => setIsConfirmingDelete(false)}
-              >
-                取消
-              </TaskActionButton>
-              <TaskActionButton
-                danger
-                disabled={isBusy}
-                onClick={() => onDelete(task.id)}
-              >
-                {isBusy ? "删除中..." : "确认删除"}
-              </TaskActionButton>
-            </>
-          ) : null}
-          {onDelete && !isConfirmingDelete ? (
-            <TaskActionButton
-              danger
-              disabled={isBusy}
-              onClick={() => setIsConfirmingDelete(true)}
-            >
-              删除
             </TaskActionButton>
           ) : null}
         </div>
@@ -1136,11 +1108,13 @@ function TaskActionButton({
   children,
   danger = false,
   disabled = false,
+  minWidth = false,
   onClick
 }: {
   children: ReactNode;
   danger?: boolean;
   disabled?: boolean;
+  minWidth?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -1149,7 +1123,7 @@ function TaskActionButton({
         danger
           ? "border-rose-400/30 bg-rose-400/10 text-rose-200"
           : "border-[var(--border)] bg-[var(--panel)] text-[var(--foreground)]"
-      }`}
+      } ${minWidth ? "min-w-24" : ""}`}
       disabled={disabled}
       onClick={onClick}
       type="button"
