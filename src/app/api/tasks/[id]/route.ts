@@ -50,12 +50,63 @@ export async function PATCH(request: Request, context: RouteContext) {
     return jsonError(TASK_ERROR_MESSAGES.notFound, 404);
   }
 
-  const nextStartAt = parsed.data.startAt ?? existingTask.startAt;
+  const isRemovingDeadline = parsed.data.hasDeadline === false;
+  const isUpdatingDeadline =
+    parsed.data.hasDeadline === true ||
+    parsed.data.startAt !== undefined ||
+    parsed.data.dueAt !== undefined;
+
+  const nextStartAt = parsed.data.startAt ?? existingTask.startAt ?? new Date();
   const nextDueAt = parsed.data.dueAt ?? existingTask.dueAt;
 
-  if (!isValidTaskDateRange(nextStartAt, nextDueAt)) {
-    return jsonError(TASK_ERROR_MESSAGES.dateRangeInvalid, 400);
+  if (!isRemovingDeadline && isUpdatingDeadline) {
+    if (!nextDueAt) {
+      return jsonError(TASK_ERROR_MESSAGES.dateInvalid, 400);
+    }
+
+    if (!isValidTaskDateRange(nextStartAt, nextDueAt)) {
+      return jsonError(TASK_ERROR_MESSAGES.dateRangeInvalid, 400);
+    }
   }
+
+  if (
+    parsed.data.title !== undefined &&
+    parsed.data.title !== existingTask.title
+  ) {
+    const duplicateTask = await prisma.task.findFirst({
+      where: {
+        userId: session.user.id,
+        title: parsed.data.title,
+        NOT: {
+          id: taskId
+        }
+      }
+    });
+
+    if (duplicateTask) {
+      return jsonError(TASK_ERROR_MESSAGES.duplicateTitle, 409);
+    }
+  }
+
+  const taskUpdateData = {
+    ...(parsed.data.title !== undefined ? { title: parsed.data.title } : {}),
+    ...(parsed.data.description !== undefined
+      ? {
+          description: normalizeOptionalDescription(parsed.data.description)
+        }
+      : {}),
+    ...(isRemovingDeadline
+      ? { startAt: null, dueAt: null }
+      : {
+          ...(parsed.data.startAt !== undefined ||
+          (parsed.data.hasDeadline === true && !existingTask.startAt)
+            ? { startAt: nextStartAt }
+            : {}),
+          ...(parsed.data.dueAt !== undefined
+            ? { dueAt: parsed.data.dueAt }
+            : {})
+        })
+  };
 
   const updateResult = await prisma.task
     .updateMany({
@@ -63,22 +114,15 @@ export async function PATCH(request: Request, context: RouteContext) {
         id: taskId,
         userId: session.user.id
       },
-      data: {
-        ...(parsed.data.title !== undefined
-          ? { title: parsed.data.title }
-          : {}),
-        ...(parsed.data.description !== undefined
-          ? {
-              description: normalizeOptionalDescription(parsed.data.description)
-            }
-          : {}),
-        ...(parsed.data.startAt !== undefined
-          ? { startAt: parsed.data.startAt }
-          : {}),
-        ...(parsed.data.dueAt !== undefined ? { dueAt: parsed.data.dueAt } : {})
-      }
+      data: taskUpdateData
     })
-    .catch(() => null);
+    .catch((error) =>
+      isUniqueConstraintError(error) ? "duplicate-title" : null
+    );
+
+  if (updateResult === "duplicate-title") {
+    return jsonError(TASK_ERROR_MESSAGES.duplicateTitle, 409);
+  }
 
   if (!updateResult?.count) {
     return jsonError(TASK_ERROR_MESSAGES.notFound, 404);
@@ -128,4 +172,13 @@ async function parseTaskId(context: RouteContext) {
   const parsed = taskIdSchema.safeParse(params.id);
 
   return parsed.success ? parsed.data : null;
+}
+
+function isUniqueConstraintError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "P2002"
+  );
 }

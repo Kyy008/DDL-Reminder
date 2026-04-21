@@ -14,8 +14,8 @@ type TaskDto = {
   id: string;
   title: string;
   description: string | null;
-  startAt: string;
-  dueAt: string;
+  startAt: string | null;
+  dueAt: string | null;
   status: string;
   createdAt: string;
   updatedAt: string;
@@ -23,14 +23,16 @@ type TaskDto = {
 
 type TaskView = TaskDto & {
   status: TaskStatusValue;
-  startDate: Date;
-  dueDate: Date;
-  progress: number;
+  hasDeadline: boolean;
+  startDate: Date | null;
+  dueDate: Date | null;
+  progress: number | null;
   deadlineStatus: DeadlineStatus;
   remainingText: string;
 };
 
 type TaskFormState = {
+  hasDeadline: boolean;
   title: string;
   description: string;
   startAt: string;
@@ -56,6 +58,7 @@ type SidebarIconName =
   | "view";
 
 const EMPTY_FORM = {
+  hasDeadline: true,
   title: "",
   description: "",
   startAt: "",
@@ -150,7 +153,7 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
       const response = await fetch("/api/tasks", {
         cache: "no-store"
       });
-      const payload = (await response.json()) as ApiTaskResponse;
+      const payload = await parseApiResponse(response);
 
       if (response.status === 401) {
         redirectToLogin();
@@ -273,7 +276,7 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
         },
         body: JSON.stringify(payload)
       });
-      const data = (await response.json()) as ApiTaskResponse;
+      const data = await parseApiResponse(response);
 
       if (response.status === 401) {
         redirectToLogin();
@@ -313,7 +316,7 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
       const response = await fetch(endpoint, {
         method
       });
-      const data = (await response.json()) as ApiTaskResponse;
+      const data = await parseApiResponse(response);
 
       if (response.status === 401) {
         redirectToLogin();
@@ -348,10 +351,11 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
     setActiveAction("edit");
     setEditingTaskId(task.id);
     setForm({
+      hasDeadline: task.hasDeadline,
       title: task.title,
       description: task.description ?? "",
-      startAt: toDatetimeLocalValue(task.startDate),
-      dueAt: toDatetimeLocalValue(task.dueDate)
+      startAt: task.startDate ? toDatetimeLocalValue(task.startDate) : "",
+      dueAt: task.dueDate ? toDatetimeLocalValue(task.dueDate) : ""
     });
   }
 
@@ -528,39 +532,81 @@ function TaskEditorForm({
         />
       </label>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <label className="flex flex-col gap-2 text-sm font-medium">
-          开始时间
+      <div className="flex flex-wrap gap-4 text-sm font-medium">
+        <label className="flex items-center gap-3">
           <input
-            className="h-11 rounded-md border border-[var(--border)] bg-[var(--field)] px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
-            onChange={(event) =>
-              onChange((currentForm) => ({
-                ...currentForm,
-                startAt: event.target.value
-              }))
+            checked={form.hasDeadline}
+            className="size-4 accent-[var(--primary)]"
+            onChange={() =>
+              onChange((currentForm) => {
+                const deadlineFields =
+                  !currentForm.startAt || !currentForm.dueAt
+                    ? createDefaultDeadlineFields()
+                    : {};
+
+                return {
+                  ...currentForm,
+                  ...deadlineFields,
+                  hasDeadline: true
+                };
+              })
             }
-            required
-            type="datetime-local"
-            value={form.startAt}
+            type="checkbox"
           />
+          设置 DDL
         </label>
 
-        <label className="flex flex-col gap-2 text-sm font-medium">
-          DDL 时间
+        <label className="flex items-center gap-3">
           <input
-            className="h-11 rounded-md border border-[var(--border)] bg-[var(--field)] px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
-            onChange={(event) =>
+            checked={!form.hasDeadline}
+            className="size-4 accent-[var(--primary)]"
+            onChange={() =>
               onChange((currentForm) => ({
                 ...currentForm,
-                dueAt: event.target.value
+                hasDeadline: false
               }))
             }
-            required
-            type="datetime-local"
-            value={form.dueAt}
+            type="checkbox"
           />
+          不设置 DDL
         </label>
       </div>
+
+      {form.hasDeadline ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="flex flex-col gap-2 text-sm font-medium">
+            开始时间
+            <input
+              className="h-11 rounded-md border border-[var(--border)] bg-[var(--field)] px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
+              onChange={(event) =>
+                onChange((currentForm) => ({
+                  ...currentForm,
+                  startAt: event.target.value
+                }))
+              }
+              required
+              type="datetime-local"
+              value={form.startAt}
+            />
+          </label>
+
+          <label className="flex flex-col gap-2 text-sm font-medium">
+            DDL 时间
+            <input
+              className="h-11 rounded-md border border-[var(--border)] bg-[var(--field)] px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
+              onChange={(event) =>
+                onChange((currentForm) => ({
+                  ...currentForm,
+                  dueAt: event.target.value
+                }))
+              }
+              required
+              type="datetime-local"
+              value={form.dueAt}
+            />
+          </label>
+        </div>
+      ) : null}
 
       <button
         className="h-11 rounded-md bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)] disabled:cursor-not-allowed disabled:opacity-60"
@@ -966,12 +1012,18 @@ function TaskCard({
       </div>
 
       <div className="mt-5">
-        <div className="mb-3 grid gap-3 text-sm sm:grid-cols-3">
-          <InfoPill label="开始" value={formatDateTime(task.startDate)} />
-          <InfoPill label="剩余" value={task.remainingText} />
-          <InfoPill label="DDL" value={formatDateTime(task.dueDate)} />
-        </div>
-        {isCompleted ? null : (
+        {task.hasDeadline && task.startDate && task.dueDate ? (
+          <div className="mb-3 grid gap-3 text-sm sm:grid-cols-3">
+            <InfoPill label="开始" value={formatDateTime(task.startDate)} />
+            <InfoPill label="剩余" value={task.remainingText} />
+            <InfoPill label="DDL" value={formatDateTime(task.dueDate)} />
+          </div>
+        ) : (
+          <div className="text-sm">
+            <InfoPill label="DDL" value="未设置" />
+          </div>
+        )}
+        {task.hasDeadline && !isCompleted && task.progress !== null ? (
           <div className="h-2.5 overflow-hidden rounded-md bg-[var(--muted)]">
             <div
               className="h-full rounded-md transition-[width]"
@@ -981,7 +1033,7 @@ function TaskCard({
               }}
             />
           </div>
-        )}
+        ) : null}
       </div>
 
       {mode === "manage" ? (
@@ -1109,26 +1161,34 @@ function TaskActionButton({
 
 function toTaskView(task: TaskDto, now: Date): TaskView {
   const status = toTaskStatus(task.status);
-  const startDate = new Date(task.startAt);
-  const dueDate = new Date(task.dueAt);
-  const deadlineStatus = getDeadlineStatus({
-    taskStatus: status,
-    dueAt: dueDate,
-    now
-  });
+  const hasDeadline = Boolean(task.startAt && task.dueAt);
+  const startDate = task.startAt ? new Date(task.startAt) : null;
+  const dueDate = task.dueAt ? new Date(task.dueAt) : null;
+  const deadlineStatus =
+    hasDeadline && dueDate
+      ? getDeadlineStatus({
+          taskStatus: status,
+          dueAt: dueDate,
+          now
+        })
+      : getTaskStatusWithoutDeadline(status);
 
   return {
     ...task,
     status,
+    hasDeadline,
     startDate,
     dueDate,
-    progress: calculateDeadlineProgress({
-      startAt: startDate,
-      dueAt: dueDate,
-      now
-    }),
+    progress:
+      hasDeadline && startDate && dueDate
+        ? calculateDeadlineProgress({
+            startAt: startDate,
+            dueAt: dueDate,
+            now
+          })
+        : null,
     deadlineStatus,
-    remainingText: getRemainingText(status, dueDate, now)
+    remainingText: dueDate ? getRemainingText(status, dueDate, now) : "无 DDL"
   };
 }
 
@@ -1137,6 +1197,16 @@ function compareTaskViews(left: TaskView, right: TaskView) {
 
   if (rankDiff !== 0) {
     return rankDiff;
+  }
+
+  if (left.hasDeadline !== right.hasDeadline) {
+    return left.hasDeadline ? -1 : 1;
+  }
+
+  if (!left.dueDate || !right.dueDate) {
+    return (
+      new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+    );
   }
 
   if (left.status === "ACTIVE") {
@@ -1152,6 +1222,18 @@ function toTaskStatus(status: string): TaskStatusValue {
   }
 
   return "ACTIVE";
+}
+
+function getTaskStatusWithoutDeadline(status: TaskStatusValue): DeadlineStatus {
+  if (status === "COMPLETED") {
+    return "completed";
+  }
+
+  if (status === "ARCHIVED") {
+    return "archived";
+  }
+
+  return "normal";
 }
 
 function getRemainingText(status: TaskStatusValue, dueAt: Date, now: Date) {
@@ -1254,20 +1336,37 @@ function toDatetimeLocalValue(date: Date) {
 }
 
 function createEmptyForm(): TaskFormState {
+  return {
+    ...EMPTY_FORM,
+    ...createDefaultDeadlineFields()
+  };
+}
+
+function createDefaultDeadlineFields() {
   const startAt = new Date();
   const dueAt = new Date(startAt.getTime() + 24 * 60 * 60 * 1000);
 
   return {
-    ...EMPTY_FORM,
     startAt: toDatetimeLocalValue(startAt),
     dueAt: toDatetimeLocalValue(dueAt)
   };
 }
 
 function formToPayload(form: TaskFormState) {
+  if (!form.hasDeadline) {
+    return {
+      title: form.title,
+      description: form.description,
+      hasDeadline: false,
+      startAt: null,
+      dueAt: null
+    };
+  }
+
   return {
     title: form.title,
     description: form.description,
+    hasDeadline: true,
     startAt: new Date(form.startAt).toISOString(),
     dueAt: new Date(form.dueAt).toISOString()
   };
@@ -1293,6 +1392,24 @@ function getApiError(data: ApiTaskResponse) {
   }
 
   return data.error || "请求失败。";
+}
+
+async function parseApiResponse(response: Response): Promise<ApiTaskResponse> {
+  const text = await response.text();
+
+  if (!text) {
+    return {
+      error: response.ok ? "接口没有返回任务数据。" : "请求失败，请稍后再试。"
+    };
+  }
+
+  try {
+    return JSON.parse(text) as ApiTaskResponse;
+  } catch {
+    return {
+      error: "接口返回内容无法解析，请稍后再试。"
+    };
+  }
 }
 
 function redirectToLogin() {

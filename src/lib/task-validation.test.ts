@@ -18,6 +18,15 @@ describe("createTaskSchema", () => {
     expect(result.success).toBe(true);
   });
 
+  it("accepts a task without a DDL", () => {
+    const result = createTaskSchema.safeParse({
+      title: "Read references",
+      hasDeadline: false
+    });
+
+    expect(result.success).toBe(true);
+  });
+
   it("rejects an empty title", () => {
     const result = createTaskSchema.safeParse({
       title: "   ",
@@ -37,6 +46,21 @@ describe("createTaskSchema", () => {
     const result = createTaskSchema.safeParse({
       title: "Submit report",
       dueAt: "not-a-date"
+    });
+
+    expect(result.success).toBe(false);
+
+    if (!result.success) {
+      expect(result.error.issues[0]?.message).toBe(
+        TASK_ERROR_MESSAGES.dateInvalid
+      );
+    }
+  });
+
+  it("requires a due time when DDL is enabled", () => {
+    const result = createTaskSchema.safeParse({
+      title: "Submit report",
+      hasDeadline: true
     });
 
     expect(result.success).toBe(false);
@@ -69,6 +93,16 @@ describe("updateTaskSchema", () => {
   it("accepts a partial update", () => {
     const result = updateTaskSchema.safeParse({
       title: "Updated title"
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("accepts removing the DDL from a task", () => {
+    const result = updateTaskSchema.safeParse({
+      hasDeadline: false,
+      startAt: null,
+      dueAt: null
     });
 
     expect(result.success).toBe(true);

@@ -3,20 +3,37 @@ import { TASK_ERROR_MESSAGES } from "./task-error-messages";
 
 export const taskIdSchema = z.string().min(1, TASK_ERROR_MESSAGES.idInvalid);
 
+const optionalDateSchema = z.preprocess(
+  (value) => (value === "" || value === null ? undefined : value),
+  z.coerce.date({ error: TASK_ERROR_MESSAGES.dateInvalid }).optional()
+);
+
 const updateTaskFieldsSchema = z.object({
   title: z.string().trim().min(1, TASK_ERROR_MESSAGES.titleRequired),
   description: z.string().trim().optional(),
-  startAt: z.coerce.date({ error: TASK_ERROR_MESSAGES.dateInvalid }).optional(),
-  dueAt: z.coerce.date({ error: TASK_ERROR_MESSAGES.dateInvalid })
+  hasDeadline: z.boolean().optional(),
+  startAt: optionalDateSchema,
+  dueAt: optionalDateSchema
 });
 
-const createTaskFieldsSchema = updateTaskFieldsSchema.extend({
-  startAt: z.coerce.date().default(() => new Date())
-});
-
-export const createTaskSchema = createTaskFieldsSchema.superRefine(
+export const createTaskSchema = updateTaskFieldsSchema.superRefine(
   (data, context) => {
-    if (data.dueAt.getTime() <= data.startAt.getTime()) {
+    if (data.hasDeadline === false) {
+      return;
+    }
+
+    if (!data.dueAt) {
+      context.addIssue({
+        code: "custom",
+        message: TASK_ERROR_MESSAGES.dateInvalid,
+        path: ["dueAt"]
+      });
+      return;
+    }
+
+    const startAt = data.startAt ?? new Date();
+
+    if (data.dueAt.getTime() <= startAt.getTime()) {
       context.addIssue({
         code: "custom",
         message: TASK_ERROR_MESSAGES.dateRangeInvalid,
@@ -29,6 +46,10 @@ export const createTaskSchema = createTaskFieldsSchema.superRefine(
 export const updateTaskSchema = updateTaskFieldsSchema
   .partial()
   .superRefine((data, context) => {
+    if (data.hasDeadline === false) {
+      return;
+    }
+
     if (
       data.startAt &&
       data.dueAt &&

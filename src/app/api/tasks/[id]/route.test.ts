@@ -78,12 +78,14 @@ describe("task detail route", () => {
       userId: "user_1",
       title: "Updated title"
     };
-    mocks.prisma.task.findFirst.mockResolvedValue({
+    mocks.prisma.task.findFirst.mockResolvedValueOnce({
       id: "task_1",
       userId: "user_1",
+      title: "Old title",
       startAt: new Date("2026-04-20T01:00:00.000Z"),
       dueAt: new Date("2026-04-20T03:00:00.000Z")
     });
+    mocks.prisma.task.findFirst.mockResolvedValueOnce(null);
     mocks.prisma.task.updateMany.mockResolvedValue({ count: 1 });
     mocks.prisma.task.findUnique.mockResolvedValue(updatedTask);
 
@@ -106,6 +108,87 @@ describe("task detail route", () => {
       },
       data: {
         title: "Updated title"
+      }
+    });
+  });
+
+  it("rejects updating a task to a duplicate title", async () => {
+    mocks.prisma.task.findFirst.mockResolvedValueOnce({
+      id: "task_1",
+      userId: "user_1",
+      title: "Old title",
+      startAt: new Date("2026-04-20T01:00:00.000Z"),
+      dueAt: new Date("2026-04-20T03:00:00.000Z")
+    });
+    mocks.prisma.task.findFirst.mockResolvedValueOnce({
+      id: "task_2",
+      userId: "user_1",
+      title: "Updated title"
+    });
+
+    const response = await PATCH(
+      new Request("http://localhost/api/tasks/task_1", {
+        method: "PATCH",
+        body: JSON.stringify({
+          title: "Updated title"
+        })
+      }),
+      routeContext
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: TASK_ERROR_MESSAGES.duplicateTitle
+    });
+    expect(mocks.prisma.task.findFirst).toHaveBeenNthCalledWith(2, {
+      where: {
+        userId: "user_1",
+        title: "Updated title",
+        NOT: {
+          id: "task_1"
+        }
+      }
+    });
+    expect(mocks.prisma.task.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("removes a task DDL", async () => {
+    const updatedTask = {
+      id: "task_1",
+      userId: "user_1",
+      title: "Updated title",
+      startAt: null,
+      dueAt: null
+    };
+    mocks.prisma.task.findFirst.mockResolvedValue({
+      id: "task_1",
+      userId: "user_1",
+      startAt: new Date("2026-04-20T01:00:00.000Z"),
+      dueAt: new Date("2026-04-20T03:00:00.000Z")
+    });
+    mocks.prisma.task.updateMany.mockResolvedValue({ count: 1 });
+    mocks.prisma.task.findUnique.mockResolvedValue(updatedTask);
+
+    const response = await PATCH(
+      new Request("http://localhost/api/tasks/task_1", {
+        method: "PATCH",
+        body: JSON.stringify({
+          hasDeadline: false
+        })
+      }),
+      routeContext
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ task: updatedTask });
+    expect(mocks.prisma.task.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: "task_1",
+        userId: "user_1"
+      },
+      data: {
+        startAt: null,
+        dueAt: null
       }
     });
   });

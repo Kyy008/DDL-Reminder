@@ -4,6 +4,7 @@ import { GET, POST } from "./route";
 const mocks = vi.hoisted(() => {
   const prisma = {
     task: {
+      findFirst: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn()
     }
@@ -28,6 +29,7 @@ describe("tasks route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getPrisma.mockReturnValue(mocks.prisma);
+    mocks.prisma.task.findFirst.mockResolvedValue(null);
     mocks.requireUserSession.mockResolvedValue({
       response: null,
       session: {
@@ -90,11 +92,83 @@ describe("tasks route", () => {
     await expect(response.json()).resolves.toEqual({ task });
     expect(mocks.prisma.task.create).toHaveBeenCalledWith({
       data: {
-        userId: "user_1",
         title: "Submit report",
         description: null,
         startAt: new Date("2026-04-20T01:00:00.000Z"),
-        dueAt: new Date("2026-04-20T02:00:00.000Z")
+        dueAt: new Date("2026-04-20T02:00:00.000Z"),
+        user: {
+          connect: {
+            id: "user_1"
+          }
+        }
+      }
+    });
+  });
+
+  it("rejects duplicate task titles for the current user", async () => {
+    mocks.prisma.task.findFirst.mockResolvedValue({
+      id: "task_existing",
+      userId: "user_1",
+      title: "Submit report"
+    });
+
+    const response = await POST(
+      new Request("http://localhost/api/tasks", {
+        method: "POST",
+        body: JSON.stringify({
+          title: "Submit report",
+          startAt: "2099-04-20T01:00:00.000Z",
+          dueAt: "2099-04-20T02:00:00.000Z"
+        })
+      })
+    );
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({
+      error: "任务标题已存在。"
+    });
+    expect(mocks.prisma.task.findFirst).toHaveBeenCalledWith({
+      where: {
+        userId: "user_1",
+        title: "Submit report"
+      }
+    });
+    expect(mocks.prisma.task.create).not.toHaveBeenCalled();
+  });
+
+  it("creates a task without a DDL", async () => {
+    const task = {
+      id: "task_1",
+      userId: "user_1",
+      title: "Read references",
+      startAt: null,
+      dueAt: null
+    };
+    mocks.prisma.task.create.mockResolvedValue(task);
+
+    const response = await POST(
+      new Request("http://localhost/api/tasks", {
+        method: "POST",
+        body: JSON.stringify({
+          title: "Read references",
+          hasDeadline: false
+        })
+      })
+    );
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({ task });
+    expect(mocks.prisma.task.create).toHaveBeenCalledWith({
+      data: {
+        title: "Read references",
+        description: null,
+        startAt: null,
+        dueAt: null,
+        user: {
+          connect: {
+            id: "user_1"
+          }
+        }
       }
     });
   });
