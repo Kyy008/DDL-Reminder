@@ -5,7 +5,11 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "DDL Reminder",
   description:
-    "Track deadlines, progress, and reminders in one focused dashboard."
+    "Track deadlines, progress, and reminders in one focused dashboard.",
+  icons: {
+    icon: "/icon/tubiao.png",
+    apple: "/icon/tubiao.png"
+  }
 };
 
 export default function RootLayout({
