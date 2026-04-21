@@ -8,10 +8,62 @@ import { sendTaskDeadlineReminderEmail } from "./mailer";
 import { getPrisma } from "./prisma";
 import { ReminderTypeValue } from "./task-constants";
 
-type TaskReminderClient = Pick<
-  ReturnType<typeof getPrisma>,
-  "reminderLog" | "task"
->;
+type TaskReminderClient = {
+  user: {
+    findUnique: (args: {
+      where: {
+        id: string;
+      };
+      select: {
+        emailReminderEnabled: true;
+      };
+    }) => Promise<{ emailReminderEnabled: boolean } | null>;
+  };
+  task: {
+    findMany: (args: {
+      where: {
+        userId: string;
+        status: "ACTIVE";
+        dueAt: {
+          gte: Date;
+        };
+      };
+      select: {
+        id: true;
+        title: true;
+        dueAt: true;
+        createdAt: true;
+        status: true;
+        user: {
+          select: {
+            email: true;
+            username: true;
+          };
+        };
+        reminderLogs: {
+          select: {
+            reminderType: true;
+          };
+        };
+      };
+    }) => Promise<ReminderTask[]>;
+  };
+  reminderLog: {
+    create: (args: {
+      data: {
+        taskId: string;
+        reminderType: ReminderTypeValue;
+        sentAt: Date;
+      };
+    }) => Promise<unknown>;
+    deleteMany: (args: {
+      where: {
+        taskId: string;
+        reminderType: ReminderTypeValue;
+      };
+    }) => Promise<unknown>;
+  };
+};
 
 type ReminderTask = {
   id: string;
@@ -45,6 +97,19 @@ export async function sendDueTaskRemindersForUser({
   prisma?: TaskReminderClient;
   userId: string;
 }) {
+  const user = await prisma.user.findUnique({
+    where: {
+      id: userId
+    },
+    select: {
+      emailReminderEnabled: true
+    }
+  });
+
+  if (!user?.emailReminderEnabled) {
+    return;
+  }
+
   const tasks = (await prisma.task.findMany({
     where: {
       userId,

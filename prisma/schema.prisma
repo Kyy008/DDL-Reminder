@@ -13,6 +13,7 @@ model User {
   email                   String                   @unique
   passwordHash            String
   emailVerifiedAt         DateTime?
+  emailReminderEnabled    Boolean                  @default(true)
   createdAt               DateTime                 @default(now())
   updatedAt               DateTime                 @updatedAt
   sessions                Session[]

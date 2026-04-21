@@ -1,0 +1,1 @@
+ALTER TABLE "User" ADD COLUMN "emailReminderEnabled" BOOLEAN NOT NULL DEFAULT true;

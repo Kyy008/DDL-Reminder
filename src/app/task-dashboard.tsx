@@ -62,6 +62,16 @@ type ApiTaskResponse = {
   }>;
 };
 
+type SettingsApiResponse = {
+  settings?: {
+    emailReminderEnabled?: boolean;
+  };
+  error?: string;
+  issues?: Array<{
+    message: string;
+  }>;
+};
+
 type WorkspaceAction = "view" | "add" | "edit" | "settings";
 type SidebarIconName =
   | "add"
@@ -158,6 +168,8 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings>(
     DEFAULT_REMINDER_SETTINGS
   );
+  const [isSettingsLoading, setIsSettingsLoading] = useState(false);
+  const [isSettingsSaving, setIsSettingsSaving] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(
     null
@@ -193,6 +205,59 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
   useEffect(() => {
     void loadTasks();
   }, [loadTasks]);
+
+  useEffect(() => {
+    if (!isManageMode || activeAction !== "settings") {
+      return;
+    }
+
+    let isCurrent = true;
+
+    async function loadSettings() {
+      setIsSettingsLoading(true);
+
+      try {
+        const response = await fetch("/api/settings", {
+          cache: "no-store"
+        });
+        const payload = await parseSettingsResponse(response);
+
+        if (response.status === 401) {
+          redirectToLogin();
+          return;
+        }
+
+        if (!response.ok) {
+          throw new Error(getSettingsApiError(payload));
+        }
+
+        if (!isCurrent) {
+          return;
+        }
+
+        setReminderSettings((currentSettings) => ({
+          ...currentSettings,
+          emailReminderEnabled:
+            payload.settings?.emailReminderEnabled ??
+            currentSettings.emailReminderEnabled
+        }));
+      } catch (settingsError) {
+        if (isCurrent) {
+          setError(getErrorMessage(settingsError));
+        }
+      } finally {
+        if (isCurrent) {
+          setIsSettingsLoading(false);
+        }
+      }
+    }
+
+    void loadSettings();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [activeAction, isManageMode]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -405,6 +470,53 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
     resetForm();
   }
 
+  async function updateEmailReminderEnabled(nextEnabled: boolean) {
+    const previousEnabled = reminderSettings.emailReminderEnabled;
+
+    setReminderSettings((currentSettings) => ({
+      ...currentSettings,
+      emailReminderEnabled: nextEnabled
+    }));
+    setIsSettingsSaving(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/settings", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          emailReminderEnabled: nextEnabled
+        })
+      });
+      const payload = await parseSettingsResponse(response);
+
+      if (response.status === 401) {
+        redirectToLogin();
+        return;
+      }
+
+      if (!response.ok) {
+        throw new Error(getSettingsApiError(payload));
+      }
+
+      setReminderSettings((currentSettings) => ({
+        ...currentSettings,
+        emailReminderEnabled:
+          payload.settings?.emailReminderEnabled ?? nextEnabled
+      }));
+    } catch (settingsError) {
+      setReminderSettings((currentSettings) => ({
+        ...currentSettings,
+        emailReminderEnabled: previousEnabled
+      }));
+      setError(getErrorMessage(settingsError));
+    } finally {
+      setIsSettingsSaving(false);
+    }
+  }
+
   if (!isManageMode) {
     return (
       <div className="flex flex-col gap-8">
@@ -506,7 +618,11 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
 
           {activeAction === "settings" ? (
             <SettingsPanel
+              isEmailReminderPending={isSettingsLoading || isSettingsSaving}
               settings={reminderSettings}
+              onEmailReminderChange={(nextEnabled) =>
+                void updateEmailReminderEnabled(nextEnabled)
+              }
               onChange={setReminderSettings}
             />
           ) : null}
@@ -923,9 +1039,13 @@ function SidebarIcon({
 }
 
 function SettingsPanel({
+  isEmailReminderPending,
+  onEmailReminderChange,
   onChange,
   settings
 }: {
+  isEmailReminderPending: boolean;
+  onEmailReminderChange: (enabled: boolean) => void;
   onChange: (
     update: (currentSettings: ReminderSettings) => ReminderSettings
   ) => void;
@@ -947,12 +1067,10 @@ function SettingsPanel({
               settings.emailReminderEnabled
                 ? "border-[var(--primary)] bg-[var(--primary)]"
                 : "border-[var(--border)] bg-[var(--muted)]"
-            }`}
+            } disabled:cursor-not-allowed disabled:opacity-60`}
+            disabled={isEmailReminderPending}
             onClick={() =>
-              onChange((currentSettings) => ({
-                ...currentSettings,
-                emailReminderEnabled: !currentSettings.emailReminderEnabled
-              }))
+              onEmailReminderChange(!settings.emailReminderEnabled)
             }
             role="switch"
             type="button"
@@ -1112,6 +1230,7 @@ function TaskCard({
   const isBusy = busyTaskId === task.id;
   const isCompleted = task.status === "COMPLETED";
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [isConfirmingComplete, setIsConfirmingComplete] = useState(false);
 
   return (
     <article
@@ -1162,10 +1281,31 @@ function TaskCard({
               danger
               disabled={isBusy}
               minWidth
-              onClick={() => setIsConfirmingDelete(true)}
+              onClick={() => {
+                setIsConfirmingComplete(false);
+                setIsConfirmingDelete(true);
+              }}
             >
               删除任务
             </TaskActionButton>
+          ) : null}
+          {onComplete && !isCompleted && isConfirmingComplete ? (
+            <>
+              <TaskActionButton
+                disabled={isBusy}
+                onClick={() => setIsConfirmingComplete(false)}
+              >
+                取消
+              </TaskActionButton>
+              <button
+                className="inline-flex h-10 min-w-24 items-center justify-center rounded-md bg-[#4bae50] px-4 text-sm font-semibold text-white transition hover:bg-[#449b48] disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isBusy}
+                onClick={() => onComplete(task.id)}
+                type="button"
+              >
+                {isBusy ? "处理中..." : "确认完成"}
+              </button>
+            </>
           ) : null}
           {isCompleted ? (
             <span
@@ -1175,14 +1315,17 @@ function TaskCard({
             >
               <CheckIcon />
             </span>
-          ) : onComplete ? (
+          ) : onComplete && !isConfirmingComplete ? (
             <button
               className="inline-flex h-10 min-w-24 items-center justify-center rounded-md bg-[#4bae50] px-4 text-sm font-semibold text-white transition hover:bg-[#449b48] disabled:cursor-not-allowed disabled:opacity-60"
               disabled={isBusy}
-              onClick={() => onComplete(task.id)}
+              onClick={() => {
+                setIsConfirmingDelete(false);
+                setIsConfirmingComplete(true);
+              }}
               type="button"
             >
-              {isBusy ? "处理中..." : "标记完成"}
+              标记完成
             </button>
           ) : null}
         </div>
@@ -1573,6 +1716,14 @@ function getApiError(data: ApiTaskResponse) {
   return data.error || "请求失败。";
 }
 
+function getSettingsApiError(data: SettingsApiResponse) {
+  if (data.issues && data.issues.length > 0) {
+    return data.issues.map((issue) => issue.message).join(" ");
+  }
+
+  return data.error || "设置保存失败。";
+}
+
 async function parseApiResponse(response: Response): Promise<ApiTaskResponse> {
   const text = await response.text();
 
@@ -1584,6 +1735,26 @@ async function parseApiResponse(response: Response): Promise<ApiTaskResponse> {
 
   try {
     return JSON.parse(text) as ApiTaskResponse;
+  } catch {
+    return {
+      error: "接口返回内容无法解析，请稍后再试。"
+    };
+  }
+}
+
+async function parseSettingsResponse(
+  response: Response
+): Promise<SettingsApiResponse> {
+  const text = await response.text();
+
+  if (!text) {
+    return {
+      error: response.ok ? "接口没有返回设置数据。" : "请求失败，请稍后再试。"
+    };
+  }
+
+  try {
+    return JSON.parse(text) as SettingsApiResponse;
   } catch {
     return {
       error: "接口返回内容无法解析，请稍后再试。"

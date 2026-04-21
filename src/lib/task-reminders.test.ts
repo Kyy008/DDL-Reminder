@@ -118,6 +118,36 @@ describe("sendDueTaskRemindersForUser", () => {
     });
   });
 
+  it("skips reminder processing when the user disabled email reminders", async () => {
+    const prisma = createPrismaMock([
+      {
+        id: "task_1",
+        title: "Submit report",
+        dueAt: new Date("2026-04-23T00:00:00.000Z"),
+        createdAt: new Date("2026-04-20T00:00:00.000Z"),
+        status: "ACTIVE",
+        user: {
+          email: "user@example.com",
+          username: "Kyy"
+        },
+        reminderLogs: []
+      }
+    ]);
+    prisma.user.findUnique.mockResolvedValueOnce({
+      emailReminderEnabled: false
+    });
+
+    await sendDueTaskRemindersForUser({
+      now: new Date("2026-04-21T01:00:00.000Z"),
+      prisma,
+      userId: "user_1"
+    });
+
+    expect(prisma.task.findMany).not.toHaveBeenCalled();
+    expect(prisma.reminderLog.create).not.toHaveBeenCalled();
+    expect(mocks.sendTaskDeadlineReminderEmail).not.toHaveBeenCalled();
+  });
+
   it("releases the reminder log when email sending fails so it can retry later", async () => {
     const prisma = createPrismaMock([
       {
@@ -154,6 +184,11 @@ describe("sendDueTaskRemindersForUser", () => {
 
 function createPrismaMock(tasks: unknown[]) {
   return {
+    user: {
+      findUnique: vi.fn().mockResolvedValue({
+        emailReminderEnabled: true
+      })
+    },
     task: {
       findMany: vi.fn().mockResolvedValue(tasks)
     },
