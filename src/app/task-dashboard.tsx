@@ -4,12 +4,14 @@ import type { FormEvent, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   calculateDeadlineProgress,
+  DAY_MS,
   DeadlineStatus,
   DEFAULT_APPROACHING_THRESHOLD_MS,
   DEFAULT_URGENT_THRESHOLD_MS,
   getDeadlineStatus,
   getRemainingTimeParts,
-  HOUR_MS
+  HOUR_MS,
+  MINUTE_MS
 } from "@/lib/deadline";
 import { TaskStatusValue } from "@/lib/task-constants";
 
@@ -42,15 +44,18 @@ type TaskFormState = {
   dueAt: string;
 };
 
-type ReminderSettings = {
-  emailReminderEnabled: boolean;
-  approachingHours: number;
-  deadlineHours: number;
+type DurationValue = {
+  days: number;
+  hours: number;
+  minutes: number;
 };
 
-type ReminderThresholds = {
-  approachingThresholdMs: number;
-  urgentThresholdMs: number;
+type DurationUnitKey = keyof DurationValue;
+
+type ReminderSettings = {
+  emailReminderEnabled: boolean;
+  approachingDuration: DurationValue;
+  deadlineDuration: DurationValue;
 };
 
 type ApiTaskResponse = {
@@ -91,8 +96,8 @@ const EMPTY_FORM = {
 
 const DEFAULT_REMINDER_SETTINGS: ReminderSettings = {
   emailReminderEnabled: true,
-  approachingHours: DEFAULT_APPROACHING_THRESHOLD_MS / HOUR_MS,
-  deadlineHours: DEFAULT_URGENT_THRESHOLD_MS / HOUR_MS
+  approachingDuration: msToDuration(DEFAULT_APPROACHING_THRESHOLD_MS),
+  deadlineDuration: msToDuration(DEFAULT_URGENT_THRESHOLD_MS)
 };
 
 const EDIT_ACTIONS: Array<{
@@ -279,17 +284,12 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
     };
   }, []);
 
-  const reminderThresholds = useMemo(
-    () => toReminderThresholds(reminderSettings),
-    [reminderSettings]
-  );
-
   const visibleTasks = useMemo(() => {
     return tasks
-      .map((task) => toTaskView(task, now, reminderThresholds))
+      .map((task) => toTaskView(task, now))
       .filter((task) => isManageMode || task.status !== "ARCHIVED")
       .sort(compareTaskViews);
-  }, [isManageMode, now, reminderThresholds, tasks]);
+  }, [isManageMode, now, tasks]);
 
   const stats = useMemo(() => {
     return {
@@ -617,14 +617,18 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
           ) : null}
 
           {activeAction === "settings" ? (
-            <SettingsPanel
-              isEmailReminderPending={isSettingsLoading || isSettingsSaving}
-              settings={reminderSettings}
-              onEmailReminderChange={(nextEnabled) =>
-                void updateEmailReminderEnabled(nextEnabled)
-              }
-              onChange={setReminderSettings}
-            />
+            <section className="grid gap-6 xl:grid-cols-2">
+              <section className="min-w-0">
+                <SettingsPanel
+                  isEmailReminderPending={isSettingsLoading || isSettingsSaving}
+                  settings={reminderSettings}
+                  onEmailReminderChange={(nextEnabled) =>
+                    void updateEmailReminderEnabled(nextEnabled)
+                  }
+                  onChange={setReminderSettings}
+                />
+              </section>
+            </section>
           ) : null}
 
           {error ? (
@@ -1071,7 +1075,7 @@ function SettingsPanel({
   settings: ReminderSettings;
 }) {
   return (
-    <section className="max-w-3xl rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5">
+    <section className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5">
       <div className="mb-2 flex items-center justify-between gap-4">
         <h1 className="text-2xl font-semibold">设置</h1>
       </div>
@@ -1104,31 +1108,24 @@ function SettingsPanel({
           </button>
         </div>
 
-        <div className="grid gap-4 py-4 sm:grid-cols-2">
-          <SettingsNumberInput
+        <div className="flex flex-col gap-5 py-4">
+          <SettingsDurationInput
             label="临近时间"
-            value={settings.approachingHours}
-            onChange={(nextHours) =>
+            value={settings.approachingDuration}
+            onChange={(nextDuration) =>
               onChange((currentSettings) => ({
                 ...currentSettings,
-                approachingHours: Math.max(
-                  nextHours,
-                  currentSettings.deadlineHours
-                )
+                approachingDuration: nextDuration
               }))
             }
           />
-          <SettingsNumberInput
+          <SettingsDurationInput
             label="截止时间"
-            value={settings.deadlineHours}
-            onChange={(nextHours) =>
+            value={settings.deadlineDuration}
+            onChange={(nextDuration) =>
               onChange((currentSettings) => ({
                 ...currentSettings,
-                approachingHours: Math.max(
-                  currentSettings.approachingHours,
-                  nextHours
-                ),
-                deadlineHours: nextHours
+                deadlineDuration: nextDuration
               }))
             }
           />
@@ -1138,32 +1135,192 @@ function SettingsPanel({
   );
 }
 
-function SettingsNumberInput({
+function SettingsDurationInput({
   label,
   onChange,
   value
 }: {
   label: string;
+  onChange: (value: DurationValue) => void;
+  value: DurationValue;
+}) {
+  function updateUnit(unit: DurationUnitKey, nextValue: number) {
+    onChange({
+      ...value,
+      [unit]: nextValue
+    });
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-sm font-semibold">{label}</p>
+        <p className="text-sm text-[var(--muted-foreground)]">
+          {formatDurationValue(value)}
+        </p>
+      </div>
+
+      <div className="grid gap-3 sm:grid-cols-3">
+        <DurationWheelColumn
+          max={14}
+          onChange={(nextValue) => updateUnit("days", nextValue)}
+          unitLabel="天"
+          value={value.days}
+        />
+        <DurationWheelColumn
+          max={23}
+          onChange={(nextValue) => updateUnit("hours", nextValue)}
+          unitLabel="小时"
+          value={value.hours}
+        />
+        <DurationWheelColumn
+          max={59}
+          onChange={(nextValue) => updateUnit("minutes", nextValue)}
+          unitLabel="分钟"
+          value={value.minutes}
+        />
+      </div>
+    </div>
+  );
+}
+
+function DurationWheelColumn({
+  max,
+  onChange,
+  unitLabel,
+  value
+}: {
+  max: number;
   onChange: (value: number) => void;
+  unitLabel: string;
   value: number;
 }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollTimeoutRef = useRef<number | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const isUserScrollingRef = useRef(false);
+  const latestValueRef = useRef(value);
+  const options = Array.from({ length: max + 1 }, (_, index) => index);
+
+  function scrollValueIntoView(nextValue: number) {
+    const target = scrollRef.current?.querySelector<HTMLElement>(
+      `[data-wheel-value="${nextValue}"]`
+    );
+
+    target?.scrollIntoView({
+      block: "center"
+    });
+  }
+
+  useEffect(() => {
+    latestValueRef.current = value;
+
+    if (!isUserScrollingRef.current) {
+      scrollValueIntoView(value);
+    }
+  }, [value]);
+
+  useEffect(() => {
+    return () => {
+      if (scrollTimeoutRef.current !== null) {
+        window.clearTimeout(scrollTimeoutRef.current);
+      }
+
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
+
+  function updateFromScroll() {
+    const container = scrollRef.current;
+
+    if (!container) {
+      return;
+    }
+
+    const containerRect = container.getBoundingClientRect();
+    const centerY = containerRect.top + containerRect.height / 2;
+    let closestValue = value;
+    let closestDistance = Number.POSITIVE_INFINITY;
+
+    container
+      .querySelectorAll<HTMLButtonElement>("[data-wheel-value]")
+      .forEach((button) => {
+        const buttonRect = button.getBoundingClientRect();
+        const buttonCenterY = buttonRect.top + buttonRect.height / 2;
+        const distance = Math.abs(buttonCenterY - centerY);
+
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestValue = Number(button.dataset.wheelValue);
+        }
+      });
+
+    if (closestValue !== latestValueRef.current) {
+      latestValueRef.current = closestValue;
+      onChange(closestValue);
+    }
+  }
+
+  function handleScroll() {
+    isUserScrollingRef.current = true;
+
+    if (animationFrameRef.current === null) {
+      animationFrameRef.current = window.requestAnimationFrame(() => {
+        animationFrameRef.current = null;
+        updateFromScroll();
+      });
+    }
+
+    if (scrollTimeoutRef.current !== null) {
+      window.clearTimeout(scrollTimeoutRef.current);
+    }
+
+    scrollTimeoutRef.current = window.setTimeout(() => {
+      updateFromScroll();
+      isUserScrollingRef.current = false;
+      scrollValueIntoView(latestValueRef.current);
+    }, 160);
+  }
+
   return (
-    <label className="flex flex-col gap-2 text-sm font-medium">
-      {label}
-      <div className="relative">
-        <input
-          className="h-11 w-full rounded-md border border-[var(--border)] bg-[var(--field)] px-3 pr-14 text-base text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
-          min={1}
-          onChange={(event) => onChange(parseSettingsHours(event.target.value))}
-          step={1}
-          type="number"
-          value={value}
-        />
-        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-[var(--muted-foreground)]">
-          小时
-        </span>
+    <div className="relative h-36 overflow-hidden rounded-md border border-[var(--border)] bg-[var(--field)]">
+      <div className="pointer-events-none absolute inset-x-2 top-1/2 z-10 h-12 -translate-y-1/2 rounded-md bg-[var(--muted)]" />
+      <span className="pointer-events-none absolute right-5 top-1/2 z-40 -translate-y-1/2 text-base font-semibold text-[var(--foreground)]">
+        {unitLabel}
+      </span>
+      <div className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_bottom,var(--field)_0%,transparent_30%,transparent_70%,var(--field)_100%)]" />
+      <div
+        className="relative z-20 h-full snap-y snap-mandatory overflow-y-auto py-11 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        onScroll={handleScroll}
+        ref={scrollRef}
+      >
+        {options.map((option) => {
+          const isSelected = option === value;
+
+          return (
+            <button
+              className={`flex h-12 w-full snap-center items-center justify-center pr-12 text-3xl font-semibold transition ${
+                isSelected
+                  ? "text-5xl text-[var(--foreground)]"
+                  : "text-[var(--muted-foreground)] opacity-55"
+              }`}
+              data-wheel-value={option}
+              key={option}
+              onClick={() => {
+                latestValueRef.current = option;
+                onChange(option);
+                scrollValueIntoView(option);
+              }}
+              type="button"
+            >
+              {option}
+            </button>
+          );
+        })}
       </div>
-    </label>
+    </div>
   );
 }
 
@@ -1474,11 +1631,7 @@ function TaskActionButton({
   );
 }
 
-function toTaskView(
-  task: TaskDto,
-  now: Date,
-  reminderThresholds: ReminderThresholds
-): TaskView {
+function toTaskView(task: TaskDto, now: Date): TaskView {
   const status = toTaskStatus(task.status);
   const hasDeadline = Boolean(task.startAt && task.dueAt);
   const startDate = task.startAt ? new Date(task.startAt) : null;
@@ -1488,9 +1641,7 @@ function toTaskView(
       ? getDeadlineStatus({
           taskStatus: status,
           dueAt: dueDate,
-          now,
-          approachingThresholdMs: reminderThresholds.approachingThresholdMs,
-          urgentThresholdMs: reminderThresholds.urgentThresholdMs
+          now
         })
       : getTaskStatusWithoutDeadline(status);
 
@@ -1673,24 +1824,28 @@ function createDefaultDeadlineFields() {
   };
 }
 
-function parseSettingsHours(value: string) {
-  const parsedValue = Number.parseInt(value, 10);
-
-  if (!Number.isFinite(parsedValue)) {
-    return 1;
-  }
-
-  return Math.max(1, parsedValue);
-}
-
-function toReminderThresholds(settings: ReminderSettings): ReminderThresholds {
-  const urgentHours = Math.max(1, settings.deadlineHours);
-  const approachingHours = Math.max(urgentHours, settings.approachingHours);
+function msToDuration(totalMs: number): DurationValue {
+  const days = Math.floor(totalMs / DAY_MS);
+  const hours = Math.floor((totalMs % DAY_MS) / HOUR_MS);
+  const minutes = Math.floor((totalMs % HOUR_MS) / MINUTE_MS);
 
   return {
-    approachingThresholdMs: approachingHours * HOUR_MS,
-    urgentThresholdMs: urgentHours * HOUR_MS
+    days: clampDurationUnit(days, 14),
+    hours: clampDurationUnit(hours, 23),
+    minutes: clampDurationUnit(minutes, 59)
   };
+}
+
+function clampDurationUnit(value: number, max: number) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.min(max, Math.max(0, value));
+}
+
+function formatDurationValue(duration: DurationValue) {
+  return `${duration.days} 天 ${duration.hours} 小时 ${duration.minutes} 分钟`;
 }
 
 function formToPayload(form: TaskFormState) {
