@@ -3,7 +3,7 @@ import { promisify } from "node:util";
 
 const scryptAsync = promisify(scrypt);
 
-export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24;
+export const SESSION_MAX_AGE_SECONDS = 14 * 24 * 60 * 60;
 export const EMAIL_VERIFICATION_TOKEN_MAX_AGE_SECONDS = 60 * 60 * 24;
 
 const PASSWORD_HASH_VERSION = "scrypt";
