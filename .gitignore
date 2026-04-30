@@ -17,3 +17,5 @@ data/*.db-shm
 !data/.gitkeep
 plan.md
 zh-plan.md
+.opencode/*
+!.opencode/rules.md
