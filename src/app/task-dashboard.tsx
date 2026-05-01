@@ -674,6 +674,7 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
                 id: t.id,
                 title: t.title,
                 status: t.status,
+                startDate: t.startDate,
                 dueDate: t.dueDate,
                 deadlineStatus: t.deadlineStatus,
                 hasDeadline: t.hasDeadline

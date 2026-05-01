@@ -13,6 +13,7 @@ type CalendarTask = {
   id: string;
   title: string;
   status: string;
+  startDate: Date | null;
   dueDate: Date | null;
   deadlineStatus: DeadlineStatus;
   hasDeadline: boolean;
@@ -36,8 +37,6 @@ export default function CalendarView({ tasks }: CalendarViewProps) {
   const [centerMonth, setCenterMonth] = useState(
     new Date(today.getFullYear(), today.getMonth(), 1)
   );
-  const [slideDir, setSlideDir] = useState<"left" | "right" | null>(null);
-  const centerKey = centerMonth.getTime();
 
   const prevMonth = new Date(
     centerMonth.getFullYear(),
@@ -51,9 +50,9 @@ export default function CalendarView({ tasks }: CalendarViewProps) {
   );
 
   const months = [
-    { date: prevMonth, key: "prev" },
-    { date: centerMonth, key: "center" },
-    { date: nextMonth, key: "next" }
+    { date: prevMonth, position: "prev" as const, cardLeft: "0%", cardWidth: "33.333%" },
+    { date: centerMonth, position: "center" as const, cardLeft: "33.333%", cardWidth: "33.333%" },
+    { date: nextMonth, position: "next" as const, cardLeft: "66.667%", cardWidth: "33.333%" }
   ];
 
   const tasksByDay = useMemo(() => {
@@ -87,74 +86,127 @@ export default function CalendarView({ tasks }: CalendarViewProps) {
 
   function handleMonthClick(monthKey: string) {
     if (monthKey === "prev") {
-      setSlideDir("right");
       setCenterMonth(
         new Date(centerMonth.getFullYear(), centerMonth.getMonth() - 1, 1)
       );
     } else if (monthKey === "next") {
-      setSlideDir("left");
       setCenterMonth(
         new Date(centerMonth.getFullYear(), centerMonth.getMonth() + 1, 1)
       );
     }
   }
 
-  const rotationStyles: Record<string, React.CSSProperties> = {
+  const positionStyles: Record<string, { transform: string; transformOrigin: string; zIndex: number; opacity: number }> = {
     prev: {
-      transform: "perspective(900px) rotateY(18deg) scale(0.92)",
-      transformOrigin: "right center"
+      transform: "rotateY(18deg) scale(0.92)",
+      transformOrigin: "right center",
+      zIndex: 1,
+      opacity: 0.5
     },
     center: {
-      transform: "none",
-      zIndex: 2
+      transform: "rotateY(0deg) scale(1)",
+      transformOrigin: "center center",
+      zIndex: 2,
+      opacity: 1
     },
     next: {
-      transform: "perspective(900px) rotateY(-18deg) scale(0.92)",
-      transformOrigin: "left center"
+      transform: "rotateY(-18deg) scale(0.92)",
+      transformOrigin: "left center",
+      zIndex: 1,
+      opacity: 0.5
     }
   };
 
   return (
     <section className="flex flex-col gap-8">
-      <style>{animKeyframes}</style>
       <section>
         <h2 className="mb-5 text-xl font-bold tracking-wide">任务总览</h2>
         <div
-          key={centerKey}
-          className="flex items-stretch justify-center gap-0"
-          style={{
-            perspective: "1000px",
-            ...slideAnimation(slideDir)
-          }}
+          className="relative h-0 overflow-visible"
+          style={{ paddingBottom: "40%" }}
         >
-          {months.map((month) => {
-            const isCenter = month.key === "center";
-            return (
-              <button
-                key={month.key}
-                aria-label={`切换到 ${formatYearMonth(month.date)}`}
-                className={`rounded-lg border p-3 text-left transition-all duration-[550ms] ease-in-out ${
-                  isCenter
-                    ? "border-[var(--primary)] bg-[var(--panel)] opacity-100"
-                    : "border-[var(--border)] bg-[var(--panel)] opacity-50 hover:opacity-70"
-                } ${month.key === "prev" ? "mr-0.5" : ""} ${month.key === "next" ? "ml-0.5" : ""}`}
-                disabled={isCenter}
-                onClick={() => handleMonthClick(month.key)}
-                style={{
-                  flex: isCenter ? "1 1 0" : "0.85 1 0",
-                  ...rotationStyles[month.key]
-                }}
-                type="button"
-              >
-                <MonthGrid
-                  isCenter={isCenter}
-                  monthDate={month.date}
-                  tasksByDay={tasksByDay}
-                  today={today}
-                />
-              </button>
-            );
-          })}
+          <div
+            className="absolute inset-0"
+            style={{ perspective: "1000px" }}
+          >
+            {months.map((month) => {
+              const pos = positionStyles[month.position];
+              return (
+                <button
+                  key={formatYearMonth(month.date)}
+                  aria-label={`切换到 ${formatYearMonth(month.date)}`}
+                  className="absolute top-0 h-full rounded-lg border p-3 text-left transition-[left,transform,opacity,border-color,background-color] duration-500 ease-in-out"
+                  disabled={month.position === "center"}
+                  onClick={() => handleMonthClick(month.position)}
+                  style={{
+                    left: month.cardLeft,
+                    width: month.cardWidth,
+                    transform: pos.transform,
+                    transformOrigin: pos.transformOrigin,
+                    zIndex: pos.zIndex,
+                    opacity: pos.opacity,
+                    borderColor:
+                      month.position === "center"
+                        ? "var(--primary)"
+                        : "var(--border)",
+                    backgroundColor: "var(--panel)"
+                  }}
+                  type="button"
+                >
+                  <MonthGrid
+                    isCenter={month.position === "center"}
+                    monthDate={month.date}
+                    tasksByDay={tasksByDay}
+                    today={today}
+                  />
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="mt-4 flex items-center justify-center gap-6">
+          <button
+            aria-label="上一个月"
+            className="inline-flex size-9 items-center justify-center rounded-md border border-[var(--border)] text-[var(--muted-foreground)] transition hover:border-[var(--primary)] hover:text-[var(--foreground)]"
+            onClick={() => handleMonthClick("prev")}
+            type="button"
+          >
+            <svg
+              aria-hidden="true"
+              className="size-4"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+          </button>
+          <span className="text-sm font-semibold text-[var(--foreground)]">
+            {formatYearMonth(centerMonth)}
+          </span>
+          <button
+            aria-label="下一个月"
+            className="inline-flex size-9 items-center justify-center rounded-md border border-[var(--border)] text-[var(--muted-foreground)] transition hover:border-[var(--primary)] hover:text-[var(--foreground)]"
+            onClick={() => handleMonthClick("next")}
+            type="button"
+          >
+            <svg
+              aria-hidden="true"
+              className="size-4"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+          </button>
         </div>
       </section>
 
@@ -281,37 +333,10 @@ function SeventyTwoHourTimeline({
 
   const isMajorLabel = (h: number) => h % 6 === 0;
 
-  const startTime = formatTimeShort(new Date(start));
-  const endTime = formatTimeShort(new Date(end));
-
   return (
     <div className="flex flex-col gap-4">
       <div className="relative h-10">
         <div className="absolute inset-x-0 top-3 h-1 rounded-full bg-[var(--muted)]" />
-
-        <div
-          className="absolute top-0.5 -translate-x-1/2"
-          style={{ left: "0%" }}
-        >
-          <div className="flex flex-col items-start -translate-y-1">
-            <div className="size-1.5 rounded-full bg-[var(--muted-foreground)]" />
-            <span className="mt-0.5 text-[10px] leading-none text-[var(--muted-foreground)]">
-              {startTime}
-            </span>
-          </div>
-        </div>
-
-        <div
-          className="absolute top-0.5 -translate-x-1/2"
-          style={{ left: "100%" }}
-        >
-          <div className="flex flex-col items-end -translate-y-1">
-            <div className="size-1.5 rounded-full bg-[var(--muted-foreground)]" />
-            <span className="mt-0.5 text-[10px] leading-none text-[var(--muted-foreground)]">
-              {endTime}
-            </span>
-          </div>
-        </div>
 
         <div
           className="absolute top-0 -translate-x-1/2"
@@ -361,7 +386,12 @@ function SeventyTwoHourTimeline({
         <div className="flex flex-col gap-2.5">
           {tasks.map((task) => {
             const dueMs = task.dueDate!.getTime();
-            const taskPct = pct(dueMs);
+            const startMs = task.startDate
+              ? Math.max(task.startDate.getTime(), start)
+              : start;
+            const barStartPct = pct(startMs);
+            const barEndPct = pct(dueMs);
+            const barWidth = barEndPct - barStartPct;
             const isOverdue = dueMs < now;
             const diffHours = Math.abs(
               Math.round((dueMs - now) / HOUR_MS * 10) / 10
@@ -376,42 +406,46 @@ function SeventyTwoHourTimeline({
                       : "text-[var(--muted-foreground)]"
                   }`}
                 >
-                  {isOverdue
-                    ? `逾期 ${diffHours}h`
-                    : `${diffHours}h 后`}
+                  {isOverdue ? `逾期 ${diffHours}h` : `${diffHours}h 后`}
                 </span>
-                <div className="relative h-8 flex-1 min-w-0">
-                  <div className="absolute inset-0 rounded bg-[var(--muted)]" />
+                <div className="relative h-10 flex-1 min-w-0">
+                  <div className="absolute inset-y-0 left-0 rounded bg-[var(--muted)]" style={{ right: 0 }} />
 
                   <div
-                    className="absolute inset-y-0 left-0 rounded-l"
+                    className="absolute inset-y-0 rounded"
                     style={{
-                      width: `${taskPct}%`,
-                      backgroundColor:
-                        STATUS_COLORS[task.deadlineStatus] + "30"
+                      left: `${barStartPct}%`,
+                      width: `${barWidth}%`,
+                      backgroundColor: STATUS_COLORS[task.deadlineStatus] + "30",
+                      border: `1px solid ${STATUS_COLORS[task.deadlineStatus]}40`
                     }}
                   />
 
-                  <div
-                    className="absolute left-0 top-1/2 -translate-y-1/2"
-                    style={{ left: `${taskPct}%` }}
+                  <span
+                    className="absolute top-0 -translate-x-1/2 -translate-y-full pb-1 text-[10px] leading-none text-[var(--muted-foreground)]"
+                    style={{ left: `${barStartPct}%` }}
                   >
-                    <div
-                      className="size-3 rounded-full border-2"
-                      style={{
-                        backgroundColor: STATUS_COLORS[task.deadlineStatus],
-                        borderColor: STATUS_COLORS[task.deadlineStatus]
-                      }}
-                    />
-                  </div>
+                    {formatTimeShort(new Date(startMs))}
+                  </span>
 
                   <span
-                    className="absolute inset-y-0 right-0 flex items-center pr-2 text-xs font-medium"
+                    className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 text-xs font-medium"
                     style={{
+                      left: `${barStartPct + (barEndPct - barStartPct) / 2}%`,
                       color: STATUS_COLORS[task.deadlineStatus]
                     }}
                   >
                     {task.title}
+                  </span>
+
+                  <span
+                    className="absolute top-0 -translate-x-1/2 -translate-y-full pb-1 text-[10px] leading-none font-semibold"
+                    style={{
+                      left: `${barEndPct}%`,
+                      color: STATUS_COLORS[task.deadlineStatus]
+                    }}
+                  >
+                    {formatTimeShort(task.dueDate!)}
                   </span>
                 </div>
               </div>
@@ -440,29 +474,4 @@ function dateKey(date: Date) {
 
 function formatYearMonth(date: Date) {
   return `${date.getFullYear()}年${date.getMonth() + 1}月`;
-}
-
-const animKeyframes = `
-@keyframes slideFromRight {
-  from { opacity: 0; transform: translateX(40px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-@keyframes slideFromLeft {
-  from { opacity: 0; transform: translateX(-40px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-`;
-
-function slideAnimation(dir: "left" | "right" | null) {
-  if (dir === "left") {
-    return {
-      animation: "slideFromRight 0.45s ease-out"
-    };
-  }
-  if (dir === "right") {
-    return {
-      animation: "slideFromLeft 0.45s ease-out"
-    };
-  }
-  return {};
 }
