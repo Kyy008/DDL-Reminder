@@ -123,7 +123,7 @@ export default function CalendarView({ tasks }: CalendarViewProps) {
         <h2 className="mb-5 text-xl font-bold tracking-wide">任务总览</h2>
         <div
           className="relative h-0 overflow-visible"
-          style={{ paddingBottom: "40%" }}
+          style={{ paddingBottom: "28%" }}
         >
           <div
             className="absolute inset-0"
@@ -335,47 +335,50 @@ function SeventyTwoHourTimeline({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="relative h-10">
-        <div className="absolute inset-x-0 top-3 h-1 rounded-full bg-[var(--muted)]" />
+      <div className="flex items-center gap-2.5">
+        <div className="w-20 shrink-0" />
+        <div className="relative h-10 flex-1 min-w-0">
+          <div className="absolute inset-x-0 top-3 h-1 rounded-full bg-[var(--muted)]" />
 
-        <div
-          className="absolute top-0 -translate-x-1/2"
-          style={{ left: `${pct(now)}%` }}
-        >
-          <div className="flex flex-col items-center">
-            <div className="size-3 rounded-full border-2 border-[var(--primary)] bg-[var(--primary)]" />
-            <span className="mt-0.5 text-[10px] font-semibold text-[var(--primary)]">
-              现在
-            </span>
-          </div>
-        </div>
-
-        {scaleMarks.map((h) => {
-          if (h === 0) return null;
-          const markMs = now + h * HOUR_MS;
-          const leftPct = pct(markMs);
-          if (leftPct < 1 || leftPct > 99) return null;
-          const major = isMajorLabel(h);
-
-          return (
-            <div
-              className="absolute top-3 -translate-x-1/2"
-              key={h}
-              style={{ left: `${leftPct}%` }}
-            >
-              {major ? (
-                <>
-                  <div className="size-1.5 rounded-full bg-[var(--muted-foreground)]" />
-                  <span className="mt-0.5 block text-center text-[10px] leading-none text-[var(--muted-foreground)]">
-                    {h > 0 ? `+${h}h` : `${h}h`}
-                  </span>
-                </>
-              ) : (
-                <div className="size-1 rounded-full bg-[var(--border)]" />
-              )}
+          <div
+            className="absolute top-0 -translate-x-1/2"
+            style={{ left: `${pct(now)}%` }}
+          >
+            <div className="flex flex-col items-center">
+              <div className="size-3 rounded-full border-2 border-[var(--primary)] bg-[var(--primary)]" />
+              <span className="mt-0.5 text-[10px] font-semibold text-[var(--primary)]">
+                现在
+              </span>
             </div>
-          );
-        })}
+          </div>
+
+          {scaleMarks.map((h) => {
+            if (h === 0) return null;
+            const markMs = now + h * HOUR_MS;
+            const leftPct = pct(markMs);
+            if (leftPct < 1 || leftPct > 99) return null;
+            const major = isMajorLabel(h);
+
+            return (
+              <div
+                className="absolute top-3 -translate-x-1/2"
+                key={h}
+                style={{ left: `${leftPct}%` }}
+              >
+                {major ? (
+                  <>
+                    <div className="size-1.5 rounded-full bg-[var(--muted-foreground)]" />
+                    <span className="mt-0.5 block text-center text-[10px] leading-none text-[var(--muted-foreground)]">
+                      {h > 0 ? `+${h}h` : `${h}h`}
+                    </span>
+                  </>
+                ) : (
+                  <div className="size-1 rounded-full bg-[var(--border)]" />
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {tasks.length === 0 ? (
