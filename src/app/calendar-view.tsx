@@ -7,6 +7,7 @@ const WEEKDAY_LABELS = ["一", "二", "三", "四", "五", "六", "日"];
 const HOUR_MS = 60 * 60 * 1000;
 const TIMELINE_HOURS = 72;
 const TIMELINE_HALF = TIMELINE_HOURS / 2;
+const TIMELINE_STEP_HOURS = 3;
 
 type CalendarTask = {
   id: string;
@@ -35,6 +36,8 @@ export default function CalendarView({ tasks }: CalendarViewProps) {
   const [centerMonth, setCenterMonth] = useState(
     new Date(today.getFullYear(), today.getMonth(), 1)
   );
+  const [slideDir, setSlideDir] = useState<"left" | "right" | null>(null);
+  const centerKey = centerMonth.getTime();
 
   const prevMonth = new Date(
     centerMonth.getFullYear(),
@@ -84,10 +87,12 @@ export default function CalendarView({ tasks }: CalendarViewProps) {
 
   function handleMonthClick(monthKey: string) {
     if (monthKey === "prev") {
+      setSlideDir("right");
       setCenterMonth(
         new Date(centerMonth.getFullYear(), centerMonth.getMonth() - 1, 1)
       );
     } else if (monthKey === "next") {
+      setSlideDir("left");
       setCenterMonth(
         new Date(centerMonth.getFullYear(), centerMonth.getMonth() + 1, 1)
       );
@@ -111,11 +116,16 @@ export default function CalendarView({ tasks }: CalendarViewProps) {
 
   return (
     <section className="flex flex-col gap-8">
+      <style>{animKeyframes}</style>
       <section>
         <h2 className="mb-5 text-xl font-bold tracking-wide">任务总览</h2>
         <div
+          key={centerKey}
           className="flex items-stretch justify-center gap-0"
-          style={{ perspective: "1000px" }}
+          style={{
+            perspective: "1000px",
+            ...slideAnimation(slideDir)
+          }}
         >
           {months.map((month) => {
             const isCenter = month.key === "center";
@@ -123,7 +133,7 @@ export default function CalendarView({ tasks }: CalendarViewProps) {
               <button
                 key={month.key}
                 aria-label={`切换到 ${formatYearMonth(month.date)}`}
-                className={`rounded-lg border p-3 text-left transition ${
+                className={`rounded-lg border p-3 text-left transition-all duration-[550ms] ease-in-out ${
                   isCenter
                     ? "border-[var(--primary)] bg-[var(--panel)] opacity-100"
                     : "border-[var(--border)] bg-[var(--panel)] opacity-50 hover:opacity-70"
@@ -264,12 +274,44 @@ function SeventyTwoHourTimeline({
     return ((ms - start) / totalMs) * 100;
   }
 
-  const scaleMarks = [-36, -24, -12, 0, 12, 24, 36];
+  const scaleMarks: number[] = [];
+  for (let h = -TIMELINE_HALF; h <= TIMELINE_HALF; h += TIMELINE_STEP_HOURS) {
+    scaleMarks.push(h);
+  }
+
+  const isMajorLabel = (h: number) => h % 6 === 0;
+
+  const startTime = formatTimeShort(new Date(start));
+  const endTime = formatTimeShort(new Date(end));
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="relative h-9">
-        <div className="absolute inset-x-0 top-2.5 h-1 rounded-full bg-[var(--muted)]" />
+      <div className="relative h-10">
+        <div className="absolute inset-x-0 top-3 h-1 rounded-full bg-[var(--muted)]" />
+
+        <div
+          className="absolute top-0.5 -translate-x-1/2"
+          style={{ left: "0%" }}
+        >
+          <div className="flex flex-col items-start -translate-y-1">
+            <div className="size-1.5 rounded-full bg-[var(--muted-foreground)]" />
+            <span className="mt-0.5 text-[10px] leading-none text-[var(--muted-foreground)]">
+              {startTime}
+            </span>
+          </div>
+        </div>
+
+        <div
+          className="absolute top-0.5 -translate-x-1/2"
+          style={{ left: "100%" }}
+        >
+          <div className="flex flex-col items-end -translate-y-1">
+            <div className="size-1.5 rounded-full bg-[var(--muted-foreground)]" />
+            <span className="mt-0.5 text-[10px] leading-none text-[var(--muted-foreground)]">
+              {endTime}
+            </span>
+          </div>
+        </div>
 
         <div
           className="absolute top-0 -translate-x-1/2"
@@ -283,30 +325,32 @@ function SeventyTwoHourTimeline({
           </div>
         </div>
 
-        {scaleMarks
-          .filter((h) => h !== 0)
-          .map((h) => {
-            const markMs = now + h * HOUR_MS;
-            const leftPct = pct(markMs);
-            if (leftPct < 2 || leftPct > 98) return null;
-            const label =
-              h > 0
-                ? `+${h}h`
-                : `${h}h`;
+        {scaleMarks.map((h) => {
+          if (h === 0) return null;
+          const markMs = now + h * HOUR_MS;
+          const leftPct = pct(markMs);
+          if (leftPct < 1 || leftPct > 99) return null;
+          const major = isMajorLabel(h);
 
-            return (
-              <div
-                className="absolute top-2.5 -translate-x-1/2"
-                key={h}
-                style={{ left: `${leftPct}%` }}
-              >
-                <div className="size-1.5 rounded-full bg-[var(--muted-foreground)]" />
-                <span className="mt-0.5 block text-[10px] leading-none text-[var(--muted-foreground)]">
-                  {label}
-                </span>
-              </div>
-            );
-          })}
+          return (
+            <div
+              className="absolute top-3 -translate-x-1/2"
+              key={h}
+              style={{ left: `${leftPct}%` }}
+            >
+              {major ? (
+                <>
+                  <div className="size-1.5 rounded-full bg-[var(--muted-foreground)]" />
+                  <span className="mt-0.5 block text-center text-[10px] leading-none text-[var(--muted-foreground)]">
+                    {h > 0 ? `+${h}h` : `${h}h`}
+                  </span>
+                </>
+              ) : (
+                <div className="size-1 rounded-full bg-[var(--border)]" />
+              )}
+            </div>
+          );
+        })}
       </div>
 
       {tasks.length === 0 ? (
@@ -379,6 +423,14 @@ function SeventyTwoHourTimeline({
   );
 }
 
+function formatTimeShort(date: Date) {
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  const hh = String(date.getHours()).padStart(2, "0");
+  const mm = String(date.getMinutes()).padStart(2, "0");
+  return `${m}-${d} ${hh}:${mm}`;
+}
+
 function dateKey(date: Date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
@@ -388,4 +440,29 @@ function dateKey(date: Date) {
 
 function formatYearMonth(date: Date) {
   return `${date.getFullYear()}年${date.getMonth() + 1}月`;
+}
+
+const animKeyframes = `
+@keyframes slideFromRight {
+  from { opacity: 0; transform: translateX(40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideFromLeft {
+  from { opacity: 0; transform: translateX(-40px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+`;
+
+function slideAnimation(dir: "left" | "right" | null) {
+  if (dir === "left") {
+    return {
+      animation: "slideFromRight 0.45s ease-out"
+    };
+  }
+  if (dir === "right") {
+    return {
+      animation: "slideFromLeft 0.45s ease-out"
+    };
+  }
+  return {};
 }
