@@ -15,6 +15,7 @@ import {
   MINUTE_MS
 } from "@/lib/deadline";
 import { TaskStatusValue } from "@/lib/task-constants";
+import CalendarView from "./calendar-view";
 
 type TaskDto = {
   id: string;
@@ -85,9 +86,10 @@ type SettingsApiResponse = {
   }>;
 };
 
-type WorkspaceAction = "view" | "add" | "settings";
+type WorkspaceAction = "view" | "calendar" | "add" | "settings";
 type SidebarIconName =
   | "add"
+  | "calendar"
   | "collapse"
   | "menu"
   | "settings"
@@ -564,6 +566,20 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
                 submittingLabel="添加中..."
               />
             </section>
+          ) : null}
+
+          {activeAction === "calendar" ? (
+            <CalendarView
+              tasks={visibleTasks.map((task) => ({
+                id: task.id,
+                title: task.title,
+                status: task.status,
+                startDate: task.startDate,
+                dueDate: task.dueDate,
+                deadlineStatus: task.deadlineStatus,
+                hasDeadline: task.hasDeadline
+              }))}
+            />
           ) : null}
 
           {activeAction === "settings" ? (
@@ -1280,6 +1296,14 @@ function TaskSidebar({
         />
 
         <TreeButton
+          active={activeAction === "calendar"}
+          collapsed={isCollapsed}
+          icon="calendar"
+          label="任务日历"
+          onClick={() => onSwitch("calendar")}
+        />
+
+        <TreeButton
           active={activeAction === "add"}
           collapsed={isCollapsed}
           icon="add"
@@ -1357,6 +1381,14 @@ function MobileTaskDrawer({
             icon="view"
             label="查看任务"
             onClick={() => switchAndClose("view")}
+          />
+
+          <TreeButton
+            active={activeAction === "calendar"}
+            collapsed={false}
+            icon="calendar"
+            label="任务日历"
+            onClick={() => switchAndClose("calendar")}
           />
 
           <TreeButton
@@ -1453,6 +1485,20 @@ function SidebarIcon({
         <path d="M4 6h16" />
         <path d="M4 12h16" />
         <path d="M4 18h16" />
+      </svg>
+    );
+  }
+
+  if (name === "calendar") {
+    return (
+      <svg {...commonProps}>
+        <rect height="18" rx="2" width="18" x="3" y="4" />
+        <path d="M16 2v4" />
+        <path d="M8 2v4" />
+        <path d="M3 10h18" />
+        <path d="M8 14h.01" />
+        <path d="M12 14h.01" />
+        <path d="M16 14h.01" />
       </svg>
     );
   }

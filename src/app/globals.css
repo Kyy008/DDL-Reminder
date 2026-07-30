@@ -189,6 +189,113 @@ a {
   animation: task-card-success-flash 1.6s ease-in-out;
 }
 
+.calendar-month-carousel {
+  position: relative;
+  overflow: hidden;
+  margin-inline: -16px;
+  padding-block: 10px;
+  perspective: 1200px;
+}
+
+.calendar-month-carousel-track {
+  display: flex;
+  width: 100%;
+  transform: translateX(-200%);
+  will-change: transform;
+}
+
+.calendar-month-carousel-track[data-transitioning="true"] {
+  transition: transform 460ms cubic-bezier(0.22, 0.75, 0.18, 1);
+}
+
+.calendar-month-carousel-track[data-direction="forward"] {
+  transform: translateX(-300%);
+}
+
+.calendar-month-carousel-track[data-direction="backward"] {
+  transform: translateX(-100%);
+}
+
+.calendar-month-carousel-slide {
+  position: relative;
+  flex: 0 0 100%;
+  min-width: 0;
+  padding-inline: 4px;
+  transform: scale(0.9);
+  opacity: 0.38;
+  filter: saturate(0.72);
+  transition:
+    transform 460ms cubic-bezier(0.22, 0.75, 0.18, 1),
+    opacity 360ms ease,
+    filter 360ms ease;
+  transform-style: preserve-3d;
+}
+
+.calendar-month-carousel-slide[data-position="left"] {
+  transform: rotateY(10deg) scale(0.9);
+}
+
+.calendar-month-carousel-slide[data-position="right"] {
+  transform: rotateY(-10deg) scale(0.9);
+}
+
+.calendar-month-carousel-slide[data-position="active"] {
+  z-index: 2;
+  transform: rotateY(0) scale(1);
+  opacity: 1;
+  filter: none;
+}
+
+.calendar-month-card {
+  height: 100%;
+  transition:
+    border-color 360ms ease,
+    box-shadow 360ms ease,
+    background-color 360ms ease;
+}
+
+.calendar-month-carousel-slide[data-position="active"] .calendar-month-card {
+  box-shadow: 0 20px 44px rgba(0, 0, 0, 0.3);
+}
+
+.calendar-month-preview-button {
+  position: absolute;
+  inset: 4px;
+  z-index: 4;
+  cursor: pointer;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+}
+
+.calendar-month-preview-button:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -4px;
+}
+
+@media (min-width: 1024px) {
+  .calendar-month-carousel {
+    margin-inline: -24px;
+  }
+
+  .calendar-month-carousel-track {
+    transform: translateX(-50%);
+  }
+
+  .calendar-month-carousel-track[data-direction="forward"] {
+    transform: translateX(-90%);
+  }
+
+  .calendar-month-carousel-track[data-direction="backward"] {
+    transform: translateX(-10%);
+  }
+
+  .calendar-month-carousel-slide {
+    flex-basis: 40%;
+    padding-inline: 7px;
+  }
+}
+
 .glass-panel {
   background: var(--glass-panel);
   backdrop-filter: var(--glass-blur);
@@ -432,6 +539,12 @@ a {
   .task-card-success-flash,
   .task-list-enter {
     animation: none;
+  }
+
+  .calendar-month-carousel-slide,
+  .calendar-month-carousel-track,
+  .calendar-month-card {
+    transition: none;
   }
 
   .task-card-success-flash {
