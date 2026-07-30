@@ -34,8 +34,8 @@ export default async function ActivatePage({
   const copy = RESULT_COPY[result];
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] px-5 py-8 sm:px-6 lg:px-8">
-      <section className="mx-auto max-w-md rounded-lg border border-[var(--border)] bg-[var(--auth-card)] p-6">
+    <main className="grid min-h-[calc(100vh-4rem)] place-items-center px-5 py-8 sm:px-6 lg:px-8">
+      <section className="auth-glass-panel dialog-panel w-full max-w-md rounded-lg border border-[var(--border)] p-6 shadow-[0_20px_70px_rgba(0,0,0,0.36)]">
         <h1 className="text-3xl font-bold">{copy.title}</h1>
         <p className="mt-3 text-sm leading-6 text-[var(--muted-foreground)]">
           {copy.body}

@@ -10,6 +10,12 @@
   --panel-strong: #1b2017;
   --auth-card: #242424;
   --field: #0f120d;
+  --page-background-image: url("/background.png");
+  --glass-panel: rgba(21, 24, 17, 0.58);
+  --glass-panel-strong: rgba(27, 32, 23, 0.68);
+  --glass-topbar: rgba(21, 24, 17, 0.7);
+  --glass-sidebar: rgba(21, 24, 17, 0.62);
+  --glass-blur: blur(18px);
   --primary: #cfd9f4;
   --primary-foreground: #08111f;
   --danger: #ff7a8a;
@@ -28,7 +34,10 @@ html {
 body {
   min-height: 100%;
   margin: 0;
-  background: var(--background);
+  background:
+    linear-gradient(rgba(5, 8, 5, 0.38), rgba(5, 8, 5, 0.5)),
+    var(--page-background-image) center / cover no-repeat fixed,
+    var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
@@ -50,11 +59,86 @@ a {
   opacity: 1;
 }
 
+@keyframes soft-list-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes dialog-backdrop-enter {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dialog-panel-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes task-card-leave {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+}
+
+@keyframes complete-badge-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.72);
+  }
+
+  70% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes form-notice-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @keyframes task-card-success-flash {
   0%,
   100% {
     border-color: var(--border);
-    background-color: var(--panel);
+    background-color: var(--glass-panel);
     box-shadow: none;
   }
 
@@ -70,18 +154,287 @@ a {
   30%,
   60% {
     border-color: var(--border);
-    background-color: var(--panel);
+    background-color: var(--glass-panel);
     box-shadow: none;
   }
+}
+
+.task-list-enter {
+  animation: soft-list-enter 240ms ease both;
+}
+
+.dialog-backdrop {
+  animation: dialog-backdrop-enter 160ms ease both;
+}
+
+.dialog-panel,
+.date-picker-popover {
+  animation: dialog-panel-enter 180ms ease-out both;
+}
+
+.task-card-leave {
+  pointer-events: none;
+  animation: task-card-leave 220ms ease forwards;
+}
+
+.complete-badge-pop {
+  animation: complete-badge-pop 260ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+}
+
+.form-notice-enter {
+  animation: form-notice-enter 180ms ease both;
 }
 
 .task-card-success-flash {
   animation: task-card-success-flash 1.6s ease-in-out;
 }
 
+.glass-panel {
+  background: var(--glass-panel);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.auth-glass-panel {
+  background: rgba(36, 36, 36, 0.78);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.date-picker {
+  position: relative;
+}
+
+.date-picker-trigger {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--field);
+  color: var(--foreground);
+  cursor: pointer;
+  padding: 11px 12px;
+  text-align: left;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background-color 180ms ease;
+}
+
+.date-picker-trigger:hover,
+.date-picker-trigger:focus-visible {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(207, 217, 244, 0.14);
+  outline: none;
+}
+
+.date-picker-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 60;
+  width: min(360px, calc(100vw - 48px));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: rgba(21, 24, 17, 0.94);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.42);
+  padding: 14px;
+}
+
+.time-picker-popover {
+  width: min(260px, calc(100vw - 48px));
+}
+
+.dialog-panel .date-picker-popover {
+  top: auto;
+  bottom: calc(100% + 8px);
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.calendar-header button,
+.calendar-actions button {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-strong);
+  color: var(--foreground);
+  cursor: pointer;
+  font-weight: 700;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.calendar-header button {
+  width: 34px;
+  height: 34px;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.calendar-header button:hover,
+.calendar-actions button:hover:not(:disabled) {
+  background: var(--muted);
+}
+
+.calendar-header button:active,
+.calendar-actions button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.calendar-month-controls {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.calendar-month-controls strong {
+  min-width: 112px;
+  text-align: center;
+}
+
+.calendar-jump-button {
+  color: var(--muted-foreground);
+}
+
+.calendar-weekdays,
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.calendar-weekdays {
+  margin-bottom: 6px;
+}
+
+.calendar-weekdays span {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.calendar-empty-day {
+  min-height: 34px;
+}
+
+.calendar-grid button {
+  min-height: 34px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  font-weight: 700;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease;
+}
+
+.calendar-grid button:hover:not(:disabled) {
+  background: var(--muted);
+}
+
+.calendar-grid button.selected {
+  border-color: var(--primary);
+  background: #263245;
+  color: var(--primary);
+}
+
+.calendar-grid button:disabled {
+  color: #5b6255;
+  cursor: not-allowed;
+}
+
+.time-picker-row,
+.settings-duration-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.time-picker-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-duration-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.time-picker-row label,
+.settings-duration-grid label {
+  display: grid;
+  gap: 6px;
+}
+
+.time-picker-row select,
+.settings-duration-grid select {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--field);
+  color: var(--foreground);
+  outline: none;
+  padding: 9px 10px;
+}
+
+.time-picker-row select:focus,
+.settings-duration-grid select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(207, 217, 244, 0.14);
+}
+
+.calendar-error {
+  margin: 12px 0 0;
+  color: #ffc3ca;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.calendar-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.calendar-actions button {
+  min-width: 72px;
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.calendar-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .task-card-success-flash {
+  .complete-badge-pop,
+  .date-picker-popover,
+  .dialog-backdrop,
+  .dialog-panel,
+  .form-notice-enter,
+  .task-card-leave,
+  .task-card-success-flash,
+  .task-list-enter {
     animation: none;
+  }
+
+  .task-card-success-flash {
     border-color: #4bae50;
     box-shadow: 0 0 0 2px rgba(75, 174, 80, 0.35);
   }

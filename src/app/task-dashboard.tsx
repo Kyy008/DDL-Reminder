@@ -2,6 +2,7 @@
 
 import type { FormEvent, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   calculateDeadlineProgress,
   DAY_MS,
@@ -84,12 +85,10 @@ type SettingsApiResponse = {
   }>;
 };
 
-type WorkspaceAction = "view" | "add" | "edit" | "settings";
+type WorkspaceAction = "view" | "add" | "settings";
 type SidebarIconName =
   | "add"
   | "collapse"
-  | "edit"
-  | "group"
   | "menu"
   | "settings"
   | "view";
@@ -107,23 +106,6 @@ const DEFAULT_REMINDER_SETTINGS: ReminderSettings = {
   approachingDuration: msToDuration(DEFAULT_APPROACHING_THRESHOLD_MS),
   deadlineDuration: msToDuration(DEFAULT_URGENT_THRESHOLD_MS)
 };
-
-const EDIT_ACTIONS: Array<{
-  id: Extract<WorkspaceAction, "add" | "edit">;
-  icon: SidebarIconName;
-  label: string;
-}> = [
-  {
-    id: "add",
-    icon: "add",
-    label: "添加任务"
-  },
-  {
-    id: "edit",
-    icon: "edit",
-    label: "编辑任务"
-  }
-];
 
 const PROGRESS_START_COLOR = "#4bae50";
 const PROGRESS_MID_COLOR = "#f5c84c";
@@ -316,8 +298,6 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
         .length
     };
   }, [visibleTasks]);
-  const hasVisibleTasks = visibleTasks.length > 0;
-  const shouldShowTaskList = isLoading || hasVisibleTasks;
   const settingsHaveChanges = !settingsAreEqual(
     appliedReminderSettings,
     draftReminderSettings
@@ -436,7 +416,7 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
 
       if (response.status === 401) {
         redirectToLogin();
-        return;
+        return false;
       }
 
       if (!response.ok) {
@@ -456,15 +436,17 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
       if (editingTaskId === taskId) {
         resetForm();
       }
+
+      return true;
     } catch (actionError) {
       setError(getErrorMessage(actionError));
+      return false;
     } finally {
       setBusyTaskId(null);
     }
   }
 
   function startEditing(task: TaskView) {
-    setActiveAction("edit");
     setEditingTaskId(task.id);
     setForm({
       hasDeadline: task.hasDeadline,
@@ -559,106 +541,139 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
               busyTaskId={busyTaskId}
               isLoading={isLoading}
               highlightedTaskId={highlightedTaskId}
-              mode="public"
+              mode="manage"
               onComplete={(taskId) =>
                 runTaskAction(taskId, `/api/tasks/${taskId}/complete`, "POST")
               }
               onDelete={(taskId) =>
-                void runTaskAction(taskId, `/api/tasks/${taskId}`, "DELETE")
+                runTaskAction(taskId, `/api/tasks/${taskId}`, "DELETE")
               }
+              onEdit={startEditing}
               tasks={visibleTasks}
             />
           ) : null}
 
           {activeAction === "add" ? (
-            <section className="grid gap-6 xl:grid-cols-2">
-              <section className="min-w-0">
-                <TaskEditorForm
-                  form={form}
-                  isSubmitting={isSubmitting}
-                  onChange={setForm}
-                  onSubmit={handleSubmit}
-                  submitLabel="添加任务"
-                  submittingLabel="添加中..."
-                />
-              </section>
-              {shouldShowTaskList ? (
-                <section className="min-w-0">
-                  <TaskList
-                    busyTaskId={busyTaskId}
-                    isLoading={isLoading}
-                    layout="single"
-                    mode="public"
-                    tasks={visibleTasks}
-                  />
-                </section>
-              ) : null}
-            </section>
-          ) : null}
-
-          {activeAction === "edit" ? (
-            <section
-              className={`grid gap-6 ${
-                hasVisibleTasks ? "xl:grid-cols-2" : ""
-              }`}
-            >
-              {editingTaskId ? (
-                <section className="min-w-0">
-                  <TaskEditorForm
-                    form={form}
-                    isSubmitting={isSubmitting}
-                    onChange={setForm}
-                    onSubmit={handleSubmit}
-                    submitLabel="保存修改"
-                    submittingLabel="保存中..."
-                  />
-                </section>
-              ) : (
-                <section className="min-w-0" />
-              )}
-              {shouldShowTaskList ? (
-                <section className="min-w-0">
-                  <TaskList
-                    busyTaskId={busyTaskId}
-                    isLoading={isLoading}
-                    layout="single"
-                    mode="manage"
-                    onEdit={startEditing}
-                    tasks={visibleTasks}
-                  />
-                </section>
-              ) : null}
+            <section className="mx-auto w-full max-w-3xl">
+              <TaskEditorForm
+                form={form}
+                isSubmitting={isSubmitting}
+                onChange={setForm}
+                onSubmit={handleSubmit}
+                submitLabel="添加任务"
+                submittingLabel="添加中..."
+              />
             </section>
           ) : null}
 
           {activeAction === "settings" ? (
-            <section className="grid gap-6 xl:grid-cols-2">
-              <section className="min-w-0">
-                <SettingsPanel
-                  hasChanges={settingsHaveChanges}
-                  isEmailReminderPending={isSettingsLoading || isSettingsSaving}
-                  isSaving={isSettingsSaving}
-                  settings={draftReminderSettings}
-                  onCancel={() =>
-                    setDraftReminderSettings(appliedReminderSettings)
-                  }
-                  onChange={setDraftReminderSettings}
-                  onSave={() => void saveReminderSettings()}
-                />
-              </section>
+            <section className="mx-auto w-full max-w-4xl">
+              <SettingsPanel
+                hasChanges={settingsHaveChanges}
+                isEmailReminderPending={isSettingsLoading || isSettingsSaving}
+                isSaving={isSettingsSaving}
+                settings={draftReminderSettings}
+                onCancel={() =>
+                  setDraftReminderSettings(appliedReminderSettings)
+                }
+                onChange={setDraftReminderSettings}
+                onSave={() => void saveReminderSettings()}
+              />
             </section>
           ) : null}
 
           {error ? (
-            <p className="rounded-md border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm font-medium text-rose-200">
+            <p className="form-notice-enter rounded-md border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm font-medium text-rose-200">
               {error}
             </p>
           ) : null}
         </div>
       </section>
 
+      {editingTaskId ? (
+        <EditTaskDialog
+          form={form}
+          isSubmitting={isSubmitting}
+          onChange={setForm}
+          onClose={resetForm}
+          onSubmit={handleSubmit}
+        />
+      ) : null}
+
       <MobileTaskDrawer activeAction={activeAction} onSwitch={switchAction} />
     </div>
+  );
+}
+
+function EditTaskDialog({
+  form,
+  isSubmitting,
+  onChange,
+  onClose,
+  onSubmit
+}: {
+  form: TaskFormState;
+  isSubmitting: boolean;
+  onChange: (update: (currentForm: TaskFormState) => TaskFormState) => void;
+  onClose: () => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && !isSubmitting) {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isSubmitting, onClose]);
+
+  return createPortal(
+    <div
+      className="dialog-backdrop fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      onMouseDown={(event) => {
+        if (event.currentTarget === event.target && !isSubmitting) {
+          onClose();
+        }
+      }}
+      role="presentation"
+    >
+      <section
+        aria-labelledby="edit-task-title"
+        aria-modal="true"
+        className="dialog-panel glass-panel max-h-[calc(100dvh-2rem)] w-[min(760px,calc(100vw-2rem))] overflow-y-auto rounded-lg border border-[var(--border)] p-5 shadow-[0_22px_60px_rgba(0,0,0,0.42)]"
+        role="dialog"
+      >
+        <div className="mb-5 flex items-center justify-between gap-4">
+          <h2 className="text-xl font-bold" id="edit-task-title">
+            编辑任务
+          </h2>
+          <button
+            aria-label="关闭编辑弹窗"
+            className="inline-flex size-9 items-center justify-center rounded-md border border-[#ff5656] bg-[#ff0000] text-2xl leading-none text-white transition hover:bg-[#d90000] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isSubmitting}
+            onClick={onClose}
+            type="button"
+          >
+            ×
+          </button>
+        </div>
+        <TaskEditorForm
+          form={form}
+          isSubmitting={isSubmitting}
+          onChange={onChange}
+          onSubmit={onSubmit}
+          submitLabel="保存修改"
+          submittingLabel="保存中..."
+          variant="dialog"
+        />
+      </section>
+    </div>,
+    document.body
   );
 }
 
@@ -668,7 +683,8 @@ function TaskEditorForm({
   onChange,
   onSubmit,
   submitLabel,
-  submittingLabel
+  submittingLabel,
+  variant = "panel"
 }: {
   form: TaskFormState;
   isSubmitting: boolean;
@@ -676,10 +692,15 @@ function TaskEditorForm({
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   submitLabel: string;
   submittingLabel: string;
+  variant?: "dialog" | "panel";
 }) {
   return (
     <form
-      className="flex flex-col gap-4 rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5"
+      className={`flex flex-col gap-4 ${
+        variant === "panel"
+          ? "glass-panel rounded-lg border border-[var(--border)] p-5"
+          : ""
+      }`}
       onSubmit={onSubmit}
     >
       <label className="flex flex-col gap-2 text-sm font-medium">
@@ -716,6 +737,7 @@ function TaskEditorForm({
           <input
             checked={form.hasDeadline}
             className="size-4 accent-[var(--primary)]"
+            name="deadline-mode"
             onChange={() =>
               onChange((currentForm) => {
                 const deadlineFields = !currentForm.dueAt
@@ -729,7 +751,7 @@ function TaskEditorForm({
                 };
               })
             }
-            type="checkbox"
+            type="radio"
           />
           设置 DDL
         </label>
@@ -738,44 +760,433 @@ function TaskEditorForm({
           <input
             checked={!form.hasDeadline}
             className="size-4 accent-[var(--primary)]"
+            name="deadline-mode"
             onChange={() =>
               onChange((currentForm) => ({
                 ...currentForm,
                 hasDeadline: false
               }))
             }
-            type="checkbox"
+            type="radio"
           />
           不设置 DDL
         </label>
       </div>
 
       {form.hasDeadline ? (
-        <label className="flex flex-col gap-2 text-sm font-medium">
-          DDL 时间
-          <input
-            className="h-11 rounded-md border border-[var(--border)] bg-[var(--field)] px-3 text-sm text-[var(--foreground)] outline-none focus:border-[var(--primary)]"
-            onChange={(event) =>
-              onChange((currentForm) => ({
-                ...currentForm,
-                dueAt: event.target.value
-              }))
-            }
-            required
-            type="datetime-local"
-            value={form.dueAt}
-          />
-        </label>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="flex flex-col gap-2 text-sm font-medium">
+            <span>截止日期</span>
+            <CalendarDatePicker
+              onChange={(dueAt) =>
+                onChange((currentForm) => ({
+                  ...currentForm,
+                  dueAt
+                }))
+              }
+              value={form.dueAt}
+            />
+          </div>
+          <div className="flex flex-col gap-2 text-sm font-medium">
+            <span>截止时间</span>
+            <TimePicker
+              onChange={(dueAt) =>
+                onChange((currentForm) => ({
+                  ...currentForm,
+                  dueAt
+                }))
+              }
+              value={form.dueAt}
+            />
+          </div>
+        </div>
       ) : null}
 
       <button
-        className="h-11 rounded-md bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)] disabled:cursor-not-allowed disabled:opacity-60"
+        className="h-11 min-w-28 self-start rounded-md bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)] transition hover:bg-[#dde6ff] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
         disabled={isSubmitting}
         type="submit"
       >
         {isSubmitting ? submittingLabel : submitLabel}
       </button>
     </form>
+  );
+}
+
+function CalendarDatePicker({
+  onChange,
+  value
+}: {
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const initialDate =
+    parseLocalDateTimeValue(value) ?? getDefaultDeadlineDate();
+  const [isOpen, setIsOpen] = useState(false);
+  const [draftDate, setDraftDate] = useState(initialDate);
+  const [visibleMonth, setVisibleMonth] = useState(
+    new Date(initialDate.getFullYear(), initialDate.getMonth(), 1)
+  );
+  const calendarDays = getCalendarDays(visibleMonth);
+  const selectedValue = parseLocalDateTimeValue(value);
+  const draftIsValid = draftDate > new Date();
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!pickerRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
+  function togglePicker() {
+    if (isOpen) {
+      setIsOpen(false);
+      return;
+    }
+
+    const nextDate = parseLocalDateTimeValue(value) ?? getDefaultDeadlineDate();
+
+    setDraftDate(nextDate);
+    setVisibleMonth(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1));
+    setIsOpen(true);
+  }
+
+  function updateDraftDay(day: Date) {
+    setDraftDate(
+      new Date(
+        day.getFullYear(),
+        day.getMonth(),
+        day.getDate(),
+        draftDate.getHours(),
+        draftDate.getMinutes()
+      )
+    );
+  }
+
+  function commitDraft() {
+    if (!draftIsValid) {
+      return;
+    }
+
+    onChange(toDatetimeLocalValue(draftDate));
+    setIsOpen(false);
+  }
+
+  return (
+    <div className="date-picker" ref={pickerRef}>
+      <button
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        aria-label="选择截止日期"
+        className="date-picker-trigger"
+        onClick={togglePicker}
+        type="button"
+      >
+        {selectedValue ? formatDateOnly(selectedValue) : "选择日期"}
+      </button>
+
+      {isOpen ? (
+        <div
+          aria-label="选择截止日期"
+          className="date-picker-popover"
+          role="dialog"
+        >
+          <div className="calendar-header">
+            <button
+              aria-label="上一年"
+              className="calendar-jump-button"
+              onClick={() =>
+                setVisibleMonth(
+                  new Date(
+                    visibleMonth.getFullYear() - 1,
+                    visibleMonth.getMonth(),
+                    1
+                  )
+                )
+              }
+              type="button"
+            >
+              «
+            </button>
+            <div className="calendar-month-controls">
+              <button
+                aria-label="上一月"
+                onClick={() =>
+                  setVisibleMonth(
+                    new Date(
+                      visibleMonth.getFullYear(),
+                      visibleMonth.getMonth() - 1,
+                      1
+                    )
+                  )
+                }
+                type="button"
+              >
+                ‹
+              </button>
+              <strong>{getMonthTitle(visibleMonth)}</strong>
+              <button
+                aria-label="下一月"
+                onClick={() =>
+                  setVisibleMonth(
+                    new Date(
+                      visibleMonth.getFullYear(),
+                      visibleMonth.getMonth() + 1,
+                      1
+                    )
+                  )
+                }
+                type="button"
+              >
+                ›
+              </button>
+            </div>
+            <button
+              aria-label="下一年"
+              className="calendar-jump-button"
+              onClick={() =>
+                setVisibleMonth(
+                  new Date(
+                    visibleMonth.getFullYear() + 1,
+                    visibleMonth.getMonth(),
+                    1
+                  )
+                )
+              }
+              type="button"
+            >
+              »
+            </button>
+          </div>
+
+          <div className="calendar-weekdays">
+            {["日", "一", "二", "三", "四", "五", "六"].map((dayName) => (
+              <span key={dayName}>{dayName}</span>
+            ))}
+          </div>
+
+          <div className="calendar-grid">
+            {calendarDays.map((day, index) => {
+              if (!day) {
+                return <span className="calendar-empty-day" key={index} />;
+              }
+
+              const disabled = isPastCalendarDay(day);
+              const selected = isSamePickerDay(day, draftDate);
+
+              return (
+                <button
+                  className={selected ? "selected" : ""}
+                  disabled={disabled}
+                  key={day.toISOString()}
+                  onClick={() => updateDraftDay(day)}
+                  type="button"
+                >
+                  {day.getDate()}
+                </button>
+              );
+            })}
+          </div>
+
+          {!draftIsValid ? (
+            <p className="calendar-error">截止日期必须晚于当前时间。</p>
+          ) : null}
+
+          <div className="calendar-actions">
+            <button onClick={() => setIsOpen(false)} type="button">
+              取消
+            </button>
+            <button
+              disabled={!draftIsValid}
+              onClick={commitDraft}
+              type="button"
+            >
+              确认
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function TimePicker({
+  onChange,
+  value
+}: {
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  const pickerRef = useRef<HTMLDivElement>(null);
+  const initialDate =
+    parseLocalDateTimeValue(value) ?? getDefaultDeadlineDate();
+  const [isOpen, setIsOpen] = useState(false);
+  const [draftDate, setDraftDate] = useState(initialDate);
+  const selectedValue = parseLocalDateTimeValue(value);
+  const draftIsValid = draftDate > new Date();
+  const minuteOptions = Array.from(
+    new Set([
+      ...Array.from({ length: 12 }, (_, index) => index * 5),
+      draftDate.getMinutes()
+    ])
+  ).sort((left, right) => left - right);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    function handlePointerDown(event: PointerEvent) {
+      if (!pickerRef.current?.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
+  function togglePicker() {
+    if (isOpen) {
+      setIsOpen(false);
+      return;
+    }
+
+    setDraftDate(parseLocalDateTimeValue(value) ?? getDefaultDeadlineDate());
+    setIsOpen(true);
+  }
+
+  function updateDraftTime(part: "hour" | "minute", nextValue: string) {
+    const nextDate = new Date(draftDate);
+
+    if (part === "hour") {
+      nextDate.setHours(Number(nextValue));
+    } else {
+      nextDate.setMinutes(Number(nextValue));
+    }
+
+    setDraftDate(nextDate);
+  }
+
+  function commitDraft() {
+    if (!draftIsValid) {
+      return;
+    }
+
+    onChange(toDatetimeLocalValue(draftDate));
+    setIsOpen(false);
+  }
+
+  return (
+    <div className="date-picker" ref={pickerRef}>
+      <button
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
+        aria-label="选择截止时间"
+        className="date-picker-trigger"
+        onClick={togglePicker}
+        type="button"
+      >
+        {selectedValue ? formatTimeOnly(selectedValue) : "选择时间"}
+      </button>
+
+      {isOpen ? (
+        <div
+          aria-label="选择截止时间"
+          className="date-picker-popover time-picker-popover"
+          role="dialog"
+        >
+          <div className="time-picker-row">
+            <label>
+              <span>时</span>
+              <select
+                onChange={(event) =>
+                  updateDraftTime("hour", event.target.value)
+                }
+                value={String(draftDate.getHours()).padStart(2, "0")}
+              >
+                {Array.from({ length: 24 }, (_, hour) => {
+                  const optionValue = String(hour).padStart(2, "0");
+
+                  return (
+                    <option key={optionValue} value={optionValue}>
+                      {optionValue}
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
+            <label>
+              <span>分</span>
+              <select
+                onChange={(event) =>
+                  updateDraftTime("minute", event.target.value)
+                }
+                value={String(draftDate.getMinutes()).padStart(2, "0")}
+              >
+                {minuteOptions.map((minute) => {
+                  const optionValue = String(minute).padStart(2, "0");
+
+                  return (
+                    <option key={optionValue} value={optionValue}>
+                      {optionValue}
+                    </option>
+                  );
+                })}
+              </select>
+            </label>
+          </div>
+
+          {!draftIsValid ? (
+            <p className="calendar-error">截止时间必须晚于当前时间。</p>
+          ) : null}
+
+          <div className="calendar-actions">
+            <button onClick={() => setIsOpen(false)} type="button">
+              取消
+            </button>
+            <button
+              disabled={!draftIsValid}
+              onClick={commitDraft}
+              type="button"
+            >
+              确认
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -830,13 +1241,11 @@ function TaskSidebar({
   activeAction: WorkspaceAction;
   onSwitch: (action: WorkspaceAction) => void;
 }) {
-  const [isEditGroupExpanded, setIsEditGroupExpanded] = useState(true);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const editGroupIsActive = activeAction === "add" || activeAction === "edit";
 
   return (
     <aside
-      className={`hidden h-full shrink-0 overflow-y-auto border-r border-[var(--border)] bg-[#171918] py-5 transition-[width,padding] duration-300 ease-in-out md:block ${
+      className={`hidden h-full shrink-0 overflow-y-auto border-r border-[var(--border)] bg-[var(--glass-sidebar)] py-5 backdrop-blur-xl transition-[width,padding] duration-300 ease-in-out md:block ${
         isCollapsed ? "w-20 px-3" : "w-72 px-4"
       }`}
     >
@@ -870,57 +1279,13 @@ function TaskSidebar({
           onClick={() => onSwitch("view")}
         />
 
-        <div className="mt-2">
-          <button
-            aria-expanded={isEditGroupExpanded}
-            aria-label="任务编辑"
-            className={`flex w-full items-center overflow-hidden rounded-md border px-3 py-3 text-left text-sm font-semibold transition ${
-              editGroupIsActive
-                ? "border-[var(--primary)] bg-[#263245] text-[var(--primary)]"
-                : "border-transparent text-[var(--primary)] hover:bg-[var(--muted)]"
-            } ${isCollapsed ? "justify-center gap-0" : "gap-3"}`}
-            onClick={() => setIsEditGroupExpanded((isExpanded) => !isExpanded)}
-            title="任务编辑"
-            type="button"
-          >
-            <SidebarIcon name="group" />
-            <span
-              className={`min-w-0 overflow-hidden whitespace-nowrap transition-[max-width,opacity] duration-200 ${
-                isCollapsed ? "max-w-0 opacity-0" : "max-w-32 opacity-100"
-              }`}
-            >
-              任务编辑
-            </span>
-            <ChevronIcon
-              className={`transition-[max-width,opacity,transform] duration-300 ${
-                isEditGroupExpanded ? "rotate-180" : "rotate-0"
-              } ${isCollapsed ? "max-w-0 opacity-0" : "max-w-5 opacity-100"}`}
-            />
-          </button>
-
-          <div
-            className={`grid overflow-hidden transition-[grid-template-rows,opacity,transform,padding] duration-300 ease-in-out ${
-              isEditGroupExpanded
-                ? "grid-rows-[1fr] opacity-100 translate-y-0"
-                : "grid-rows-[0fr] opacity-0 -translate-y-1"
-            } ${isCollapsed ? "pl-0" : "pl-6"}`}
-          >
-            <div className="min-h-0">
-              <div className="mt-1 flex flex-col gap-1">
-                {EDIT_ACTIONS.map((action) => (
-                  <TreeButton
-                    active={activeAction === action.id}
-                    collapsed={isCollapsed}
-                    icon={action.icon}
-                    key={action.id}
-                    label={action.label}
-                    onClick={() => onSwitch(action.id)}
-                  />
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <TreeButton
+          active={activeAction === "add"}
+          collapsed={isCollapsed}
+          icon="add"
+          label="添加任务"
+          onClick={() => onSwitch("add")}
+        />
       </nav>
 
       <div className="mt-4 border-t border-[var(--border)] pt-4">
@@ -944,8 +1309,6 @@ function MobileTaskDrawer({
   onSwitch: (action: WorkspaceAction) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [isEditGroupExpanded, setIsEditGroupExpanded] = useState(true);
-  const editGroupIsActive = activeAction === "add" || activeAction === "edit";
 
   function switchAndClose(action: WorkspaceAction) {
     onSwitch(action);
@@ -964,7 +1327,7 @@ function MobileTaskDrawer({
       ) : null}
 
       <aside
-        className={`fixed bottom-0 left-0 top-16 z-30 overflow-y-auto border-r border-[var(--border)] bg-[#171918] py-5 transition-[width,padding] duration-300 ease-in-out md:hidden ${
+        className={`fixed bottom-0 left-0 top-16 z-30 overflow-y-auto border-r border-[var(--border)] bg-[var(--glass-sidebar)] py-5 backdrop-blur-xl transition-[width,padding] duration-300 ease-in-out md:hidden ${
           isOpen ? "w-72 px-4" : "w-16 px-3"
         }`}
       >
@@ -996,55 +1359,13 @@ function MobileTaskDrawer({
             onClick={() => switchAndClose("view")}
           />
 
-          <div className="mt-2">
-            <button
-              aria-expanded={isEditGroupExpanded}
-              aria-label="任务编辑"
-              className={`flex w-full items-center gap-3 overflow-hidden rounded-md border px-3 py-3 text-left text-sm font-semibold transition ${
-                editGroupIsActive
-                  ? "border-[var(--primary)] bg-[#263245] text-[var(--primary)]"
-                  : "border-transparent text-[var(--primary)] hover:bg-[var(--muted)]"
-              }`}
-              onClick={() =>
-                setIsEditGroupExpanded((isExpanded) => !isExpanded)
-              }
-              title="任务编辑"
-              type="button"
-            >
-              <SidebarIcon name="group" />
-              <span className="min-w-0 flex-1 overflow-hidden whitespace-nowrap">
-                任务编辑
-              </span>
-              <ChevronIcon
-                className={`transition-transform duration-300 ${
-                  isEditGroupExpanded ? "rotate-180" : "rotate-0"
-                }`}
-              />
-            </button>
-
-            <div
-              className={`grid overflow-hidden pl-6 transition-[grid-template-rows,opacity,transform,padding] duration-300 ease-in-out ${
-                isEditGroupExpanded
-                  ? "grid-rows-[1fr] opacity-100 translate-y-0"
-                  : "grid-rows-[0fr] opacity-0 -translate-y-1"
-              }`}
-            >
-              <div className="min-h-0">
-                <div className="mt-1 flex flex-col gap-1">
-                  {EDIT_ACTIONS.map((action) => (
-                    <TreeButton
-                      active={activeAction === action.id}
-                      collapsed={false}
-                      icon={action.icon}
-                      key={action.id}
-                      label={action.label}
-                      onClick={() => switchAndClose(action.id)}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
+          <TreeButton
+            active={activeAction === "add"}
+            collapsed={false}
+            icon="add"
+            label="添加任务"
+            onClick={() => switchAndClose("add")}
+          />
 
           <div className="mt-4 border-t border-[var(--border)] pt-4">
             <TreeButton
@@ -1058,23 +1379,6 @@ function MobileTaskDrawer({
         </nav>
       </aside>
     </>
-  );
-}
-
-function ChevronIcon({ className = "" }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden="true"
-      className={`h-5 w-5 shrink-0 overflow-hidden ${className}`}
-      fill="none"
-      stroke="currentColor"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      strokeWidth="2"
-      viewBox="0 0 24 24"
-    >
-      <path d="m6 9 6 6 6-6" />
-    </svg>
   );
 }
 
@@ -1143,16 +1447,6 @@ function SidebarIcon({
     );
   }
 
-  if (name === "group") {
-    return (
-      <svg {...commonProps}>
-        <path d="M6 4h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
-        <path d="M8 9h8" />
-        <path d="M8 15h5" />
-      </svg>
-    );
-  }
-
   if (name === "menu") {
     return (
       <svg {...commonProps}>
@@ -1168,15 +1462,6 @@ function SidebarIcon({
       <svg {...commonProps}>
         <path d="M12 5v14" />
         <path d="M5 12h14" />
-      </svg>
-    );
-  }
-
-  if (name === "edit") {
-    return (
-      <svg {...commonProps}>
-        <path d="M12 20h9" />
-        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
       </svg>
     );
   }
@@ -1217,9 +1502,14 @@ function SettingsPanel({
   settings: ReminderSettings;
 }) {
   return (
-    <section className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5">
-      <div className="mb-2 flex items-center justify-between gap-4">
-        <h1 className="text-2xl font-semibold">设置</h1>
+    <section className="glass-panel rounded-xl border border-[var(--border)] p-5 shadow-2xl shadow-black/20 sm:p-7">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">提醒设置</h1>
+          <p className="mt-1 text-sm text-[var(--muted-foreground)]">
+            设置邮件提醒以及任务进入临近、紧急状态的时间阈值。
+          </p>
+        </div>
         <div className="flex items-center gap-2">
           {hasChanges ? (
             <button
@@ -1241,14 +1531,19 @@ function SettingsPanel({
             onClick={onSave}
             type="button"
           >
-            {isSaving ? "保存中..." : "变更设置"}
+            {isSaving ? "保存中..." : "保存设置"}
           </button>
         </div>
       </div>
 
-      <div className="divide-y divide-[var(--border)]">
-        <div className="flex items-center justify-between gap-4 py-4">
-          <span className="text-sm font-semibold">邮件提醒</span>
+      <div className="flex flex-col gap-5">
+        <div className="flex items-center justify-between gap-4 rounded-lg border border-[var(--border)] bg-[var(--panel-strong)] px-4 py-4">
+          <div>
+            <p className="text-sm font-semibold">邮件提醒</p>
+            <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+              在任务临近截止或进入紧急状态时发送邮件。
+            </p>
+          </div>
           <button
             aria-checked={settings.emailReminderEnabled}
             aria-label="是否邮件提醒"
@@ -1277,9 +1572,10 @@ function SettingsPanel({
           </button>
         </div>
 
-        <div className="flex flex-col gap-5 py-4">
+        <div className="grid gap-4 lg:grid-cols-2">
           <SettingsDurationInput
             label="临近时间"
+            description="距离截止时间少于该时长时标记为临近"
             value={settings.approachingDuration}
             onChange={(nextDuration) =>
               onChange((currentSettings) => ({
@@ -1290,6 +1586,7 @@ function SettingsPanel({
           />
           <SettingsDurationInput
             label="紧急时间"
+            description="距离截止时间少于该时长时标记为紧急"
             value={settings.deadlineDuration}
             onChange={(nextDuration) =>
               onChange((currentSettings) => ({
@@ -1305,10 +1602,12 @@ function SettingsPanel({
 }
 
 function SettingsDurationInput({
+  description,
   label,
   onChange,
   value
 }: {
+  description: string;
   label: string;
   onChange: (value: DurationValue) => void;
   value: DurationValue;
@@ -1321,175 +1620,74 @@ function SettingsDurationInput({
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <p className="text-sm font-semibold">{label}</p>
-        <p className="text-sm text-[var(--muted-foreground)]">
-          {formatDurationValue(value)}
+    <article className="flex flex-col gap-4 rounded-lg border border-[var(--border)] bg-[var(--panel-strong)] p-4">
+      <div>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-base font-semibold">{label}</h2>
+          <p className="rounded-full border border-[var(--border)] bg-[var(--muted)] px-3 py-1 text-xs font-semibold text-[var(--foreground)]">
+            {formatDurationValue(value)}
+          </p>
+        </div>
+        <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+          {description}
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        <DurationWheelColumn
+      <div className="settings-duration-grid">
+        <DurationSelect
+          label={`${label}：天`}
           max={14}
           onChange={(nextValue) => updateUnit("days", nextValue)}
           unitLabel="天"
           value={value.days}
         />
-        <DurationWheelColumn
+        <DurationSelect
+          label={`${label}：小时`}
           max={23}
           onChange={(nextValue) => updateUnit("hours", nextValue)}
           unitLabel="小时"
           value={value.hours}
         />
-        <DurationWheelColumn
+        <DurationSelect
+          label={`${label}：分钟`}
           max={59}
           onChange={(nextValue) => updateUnit("minutes", nextValue)}
           unitLabel="分钟"
           value={value.minutes}
         />
       </div>
-    </div>
+    </article>
   );
 }
 
-function DurationWheelColumn({
+function DurationSelect({
+  label,
   max,
   onChange,
   unitLabel,
   value
 }: {
+  label: string;
   max: number;
   onChange: (value: number) => void;
   unitLabel: string;
   value: number;
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const scrollTimeoutRef = useRef<number | null>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const isUserScrollingRef = useRef(false);
-  const latestValueRef = useRef(value);
-  const options = Array.from({ length: max + 1 }, (_, index) => index);
-
-  function scrollValueIntoView(nextValue: number) {
-    const target = scrollRef.current?.querySelector<HTMLElement>(
-      `[data-wheel-value="${nextValue}"]`
-    );
-
-    target?.scrollIntoView({
-      block: "center"
-    });
-  }
-
-  useEffect(() => {
-    latestValueRef.current = value;
-
-    if (!isUserScrollingRef.current) {
-      scrollValueIntoView(value);
-    }
-  }, [value]);
-
-  useEffect(() => {
-    return () => {
-      if (scrollTimeoutRef.current !== null) {
-        window.clearTimeout(scrollTimeoutRef.current);
-      }
-
-      if (animationFrameRef.current !== null) {
-        window.cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, []);
-
-  function updateFromScroll() {
-    const container = scrollRef.current;
-
-    if (!container) {
-      return;
-    }
-
-    const containerRect = container.getBoundingClientRect();
-    const centerY = containerRect.top + containerRect.height / 2;
-    let closestValue = value;
-    let closestDistance = Number.POSITIVE_INFINITY;
-
-    container
-      .querySelectorAll<HTMLButtonElement>("[data-wheel-value]")
-      .forEach((button) => {
-        const buttonRect = button.getBoundingClientRect();
-        const buttonCenterY = buttonRect.top + buttonRect.height / 2;
-        const distance = Math.abs(buttonCenterY - centerY);
-
-        if (distance < closestDistance) {
-          closestDistance = distance;
-          closestValue = Number(button.dataset.wheelValue);
-        }
-      });
-
-    if (closestValue !== latestValueRef.current) {
-      latestValueRef.current = closestValue;
-      onChange(closestValue);
-    }
-  }
-
-  function handleScroll() {
-    isUserScrollingRef.current = true;
-
-    if (animationFrameRef.current === null) {
-      animationFrameRef.current = window.requestAnimationFrame(() => {
-        animationFrameRef.current = null;
-        updateFromScroll();
-      });
-    }
-
-    if (scrollTimeoutRef.current !== null) {
-      window.clearTimeout(scrollTimeoutRef.current);
-    }
-
-    scrollTimeoutRef.current = window.setTimeout(() => {
-      updateFromScroll();
-      isUserScrollingRef.current = false;
-      scrollValueIntoView(latestValueRef.current);
-    }, 160);
-  }
-
   return (
-    <div className="relative h-32 overflow-hidden rounded-md border border-[var(--border)] bg-[var(--field)] sm:h-36">
-      <div className="pointer-events-none absolute inset-x-1 top-1/2 z-10 h-12 -translate-y-1/2 rounded-md bg-[var(--muted)] sm:inset-x-2" />
-      <span className="pointer-events-none absolute right-2 top-1/2 z-40 -translate-y-1/2 text-sm font-semibold text-[var(--foreground)] sm:right-5 sm:text-base">
-        {unitLabel}
-      </span>
-      <div className="pointer-events-none absolute inset-0 z-30 bg-[linear-gradient(to_bottom,var(--field)_0%,transparent_30%,transparent_70%,var(--field)_100%)]" />
-      <div
-        className="relative z-20 h-full snap-y snap-mandatory overflow-y-auto py-10 [scrollbar-width:none] sm:py-11 [&::-webkit-scrollbar]:hidden"
-        onScroll={handleScroll}
-        ref={scrollRef}
+    <label>
+      <span>{unitLabel}</span>
+      <select
+        aria-label={label}
+        onChange={(event) => onChange(Number(event.target.value))}
+        value={value}
       >
-        {options.map((option) => {
-          const isSelected = option === value;
-
-          return (
-            <button
-              className={`flex h-12 w-full snap-center items-center justify-center pr-8 text-xl font-semibold transition sm:pr-12 sm:text-3xl ${
-                isSelected
-                  ? "text-3xl text-[var(--foreground)] sm:text-5xl"
-                  : "text-[var(--muted-foreground)] opacity-55"
-              }`}
-              data-wheel-value={option}
-              key={option}
-              onClick={() => {
-                latestValueRef.current = option;
-                onChange(option);
-                scrollValueIntoView(option);
-              }}
-              type="button"
-            >
-              {option}
-            </button>
-          );
-        })}
-      </div>
-    </div>
+        {Array.from({ length: max + 1 }, (_, option) => (
+          <option key={option} value={option}>
+            {option}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -1497,7 +1695,6 @@ function TaskList({
   busyTaskId,
   highlightedTaskId,
   isLoading,
-  layout = "grid",
   mode,
   onArchive,
   onComplete,
@@ -1508,17 +1705,16 @@ function TaskList({
   busyTaskId: string | null;
   highlightedTaskId?: string | null;
   isLoading: boolean;
-  layout?: "grid" | "single";
   mode: "public" | "manage";
   onArchive?: (taskId: string) => void;
-  onComplete?: (taskId: string) => void;
-  onDelete?: (taskId: string) => void;
+  onComplete?: (taskId: string) => Promise<boolean>;
+  onDelete?: (taskId: string) => Promise<boolean>;
   onEdit?: (task: TaskView) => void;
   tasks: TaskView[];
 }) {
   if (isLoading) {
     return (
-      <section className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--panel)] p-8 text-center">
+      <section className="glass-panel rounded-lg border border-dashed border-[var(--border)] p-8 text-center">
         <p className="text-lg font-semibold">正在读取任务</p>
         <p className="mt-2 text-sm text-[var(--muted-foreground)]">
           DDL 清单马上出现。
@@ -1532,9 +1728,7 @@ function TaskList({
   }
 
   return (
-    <section
-      className={`grid gap-4 ${layout === "grid" ? "md:grid-cols-2" : ""}`}
-    >
+    <section className="task-list-enter grid gap-4">
       {tasks.map((task) => (
         <TaskCard
           busyTaskId={busyTaskId}
@@ -1566,159 +1760,232 @@ function TaskCard({
   isHighlighted?: boolean;
   mode: "public" | "manage";
   onArchive?: (taskId: string) => void;
-  onComplete?: (taskId: string) => void;
-  onDelete?: (taskId: string) => void;
+  onComplete?: (taskId: string) => Promise<boolean>;
+  onDelete?: (taskId: string) => Promise<boolean>;
   onEdit?: (task: TaskView) => void;
   task: TaskView;
 }) {
   const meta = STATUS_META[task.deadlineStatus];
   const isBusy = busyTaskId === task.id;
   const isCompleted = task.status === "COMPLETED";
-  const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
-  const [isConfirmingComplete, setIsConfirmingComplete] = useState(false);
+  const [pendingAction, setPendingAction] = useState<
+    "complete" | "delete" | null
+  >(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  async function confirmPendingAction() {
+    const action = pendingAction;
+
+    setPendingAction(null);
+
+    if (action === "delete" && onDelete) {
+      setIsDeleting(true);
+      await waitForUiAnimation(220);
+
+      const succeeded = await onDelete(task.id);
+
+      if (!succeeded) {
+        setIsDeleting(false);
+      }
+    }
+
+    if (action === "complete" && onComplete) {
+      await onComplete(task.id);
+    }
+  }
 
   return (
-    <article
-      className={`rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5 ${
-        isHighlighted ? "task-card-success-flash" : ""
-      }`}
-      data-task-card-id={task.id}
-    >
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-3">
-            <h2 className="break-words text-2xl font-semibold leading-tight">
-              {task.title}
-            </h2>
-            <span
-              className={`inline-flex rounded-md border px-2.5 py-1 text-xs font-semibold ${meta.toneClass}`}
-            >
-              {meta.label}
-            </span>
-          </div>
-          {task.description ? (
-            <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--muted-foreground)]">
-              {task.description}
-            </p>
-          ) : null}
-        </div>
-        <div className="flex shrink-0 flex-wrap items-center gap-2 lg:self-start">
-          {onDelete && isConfirmingDelete ? (
-            <>
-              <TaskActionButton
-                disabled={isBusy}
-                onClick={() => setIsConfirmingDelete(false)}
+    <>
+      <article
+        className={`glass-panel rounded-lg border border-[var(--border)] p-5 transition-[border-color,box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:border-[var(--primary)] hover:shadow-[0_14px_34px_rgba(0,0,0,0.2)] ${
+          isHighlighted ? "task-card-success-flash" : ""
+        } ${isDeleting ? "task-card-leave" : ""}`}
+        data-task-card-id={task.id}
+      >
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="break-words text-2xl font-semibold leading-tight">
+                {task.title}
+              </h2>
+              <span
+                className={`inline-flex rounded-md border px-2.5 py-1 text-xs font-semibold ${meta.toneClass}`}
               >
-                取消
+                {meta.label}
+              </span>
+            </div>
+            {task.description ? (
+              <p className="mt-3 whitespace-pre-wrap break-words text-sm leading-6 text-[var(--muted-foreground)]">
+                {task.description}
+              </p>
+            ) : null}
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2 lg:self-start">
+            {mode === "manage" && onEdit ? (
+              <TaskActionButton
+                disabled={isBusy || isDeleting}
+                variant="edit"
+                onClick={() => onEdit(task)}
+              >
+                编辑任务
               </TaskActionButton>
+            ) : null}
+            {onDelete ? (
               <TaskActionButton
                 danger
-                disabled={isBusy}
+                disabled={isBusy || isDeleting}
                 minWidth
-                onClick={() => onDelete(task.id)}
+                onClick={() => setPendingAction("delete")}
               >
-                {isBusy ? "删除中..." : "确认删除"}
+                删除任务
               </TaskActionButton>
-            </>
-          ) : null}
-          {onDelete && !isConfirmingDelete ? (
-            <TaskActionButton
-              danger
-              disabled={isBusy}
-              minWidth
-              onClick={() => {
-                setIsConfirmingComplete(false);
-                setIsConfirmingDelete(true);
-              }}
-            >
-              删除任务
-            </TaskActionButton>
-          ) : null}
-          {onComplete && !isCompleted && isConfirmingComplete ? (
-            <>
-              <TaskActionButton
-                disabled={isBusy}
-                onClick={() => setIsConfirmingComplete(false)}
+            ) : null}
+            {isCompleted ? (
+              <span
+                aria-label="已完成"
+                className="complete-badge-pop inline-flex size-10 items-center justify-center rounded-full bg-[#4bae50] text-white shadow-sm"
+                title="已完成"
               >
-                取消
-              </TaskActionButton>
+                <CheckIcon />
+              </span>
+            ) : onComplete ? (
               <button
-                className="inline-flex h-10 min-w-24 items-center justify-center rounded-md bg-[#4bae50] px-4 text-sm font-semibold text-white transition hover:bg-[#449b48] disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={isBusy}
-                onClick={() => onComplete(task.id)}
+                className="inline-flex h-10 min-w-24 items-center justify-center rounded-md bg-[#4bae50] px-4 text-sm font-semibold text-white transition hover:bg-[#449b48] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={isBusy || isDeleting}
+                onClick={() => setPendingAction("complete")}
                 type="button"
               >
-                {isBusy ? "处理中..." : "确认完成"}
+                标记完成
               </button>
-            </>
-          ) : null}
-          {isCompleted ? (
-            <span
-              aria-label="已完成"
-              className="inline-flex size-10 items-center justify-center rounded-full bg-[#4bae50] text-white shadow-sm"
-              title="已完成"
-            >
-              <CheckIcon />
-            </span>
-          ) : onComplete && !isConfirmingComplete ? (
-            <button
-              className="inline-flex h-10 min-w-24 items-center justify-center rounded-md bg-[#4bae50] px-4 text-sm font-semibold text-white transition hover:bg-[#449b48] disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={isBusy}
-              onClick={() => {
-                setIsConfirmingDelete(false);
-                setIsConfirmingComplete(true);
-              }}
-              type="button"
-            >
-              标记完成
-            </button>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="mt-5">
+          {task.hasDeadline && task.startDate && task.dueDate ? (
+            <div className="mb-3 grid gap-3 text-sm sm:grid-cols-3">
+              <InfoPill
+                label="添加时间"
+                value={formatDateTime(task.startDate)}
+              />
+              <InfoPill label="剩余时间" value={task.remainingText} />
+              <InfoPill label="截止时间" value={formatDateTime(task.dueDate)} />
+            </div>
+          ) : (
+            <div className="text-sm">
+              <InfoPill label="DDL" value="未设置" />
+            </div>
+          )}
+          {task.hasDeadline && !isCompleted && task.progress !== null ? (
+            <div className="h-2.5 overflow-hidden rounded-md bg-[var(--muted)]">
+              <div
+                className="h-full rounded-md transition-[width,background-color] duration-200"
+                style={{
+                  width: `${task.progress}%`,
+                  backgroundColor: getProgressColor(task.progress)
+                }}
+              />
+            </div>
           ) : null}
         </div>
-      </div>
 
-      <div className="mt-5">
-        {task.hasDeadline && task.startDate && task.dueDate ? (
-          <div className="mb-3 grid gap-3 text-sm sm:grid-cols-3">
-            <InfoPill label="添加时间" value={formatDateTime(task.startDate)} />
-            <InfoPill label="剩余时间" value={task.remainingText} />
-            <InfoPill label="截止时间" value={formatDateTime(task.dueDate)} />
-          </div>
-        ) : (
-          <div className="text-sm">
-            <InfoPill label="DDL" value="未设置" />
-          </div>
-        )}
-        {task.hasDeadline && !isCompleted && task.progress !== null ? (
-          <div className="h-2.5 overflow-hidden rounded-md bg-[var(--muted)]">
-            <div
-              className="h-full rounded-md transition-[width]"
-              style={{
-                width: `${task.progress}%`,
-                backgroundColor: getProgressColor(task.progress)
-              }}
-            />
-          </div>
-        ) : null}
-      </div>
-
-      {mode === "manage" ? (
-        <div className="mt-5 flex flex-wrap gap-2">
-          {onEdit ? (
-            <TaskActionButton onClick={() => onEdit(task)}>
-              编辑
-            </TaskActionButton>
-          ) : null}
-          {onArchive && task.status !== "ARCHIVED" ? (
+        {mode === "manage" && onArchive && task.status !== "ARCHIVED" ? (
+          <div className="mt-5 flex flex-wrap gap-2">
             <TaskActionButton
               disabled={isBusy}
               onClick={() => onArchive(task.id)}
             >
               归档
             </TaskActionButton>
-          ) : null}
-        </div>
+          </div>
+        ) : null}
+      </article>
+
+      {pendingAction ? (
+        <ConfirmDialog
+          confirmTone={pendingAction === "delete" ? "danger" : "success"}
+          isBusy={isBusy}
+          message={
+            pendingAction === "delete"
+              ? `是否确认删除任务“${task.title}”？`
+              : `是否确认完成任务“${task.title}”？`
+          }
+          onCancel={() => setPendingAction(null)}
+          onConfirm={() => void confirmPendingAction()}
+        />
       ) : null}
-    </article>
+    </>
+  );
+}
+
+function ConfirmDialog({
+  confirmTone,
+  isBusy,
+  message,
+  onCancel,
+  onConfirm
+}: {
+  confirmTone: "danger" | "success";
+  isBusy: boolean;
+  message: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape" && !isBusy) {
+        onCancel();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isBusy, onCancel]);
+
+  return createPortal(
+    <div
+      className="dialog-backdrop fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      onMouseDown={(event) => {
+        if (event.currentTarget === event.target && !isBusy) {
+          onCancel();
+        }
+      }}
+      role="presentation"
+    >
+      <section
+        aria-modal="true"
+        className="dialog-panel glass-panel w-[min(380px,calc(100vw-2rem))] rounded-lg border border-[var(--border)] p-6 text-center shadow-[0_22px_60px_rgba(0,0,0,0.42)]"
+        role="dialog"
+      >
+        <p className="text-base font-bold leading-7">{message}</p>
+        <div className="mt-6 flex justify-center gap-3">
+          <button
+            className="inline-flex h-10 min-w-20 items-center justify-center rounded-md border border-[var(--border)] bg-[var(--panel-strong)] px-4 text-sm font-semibold transition hover:bg-[var(--muted)] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={isBusy}
+            onClick={onCancel}
+            type="button"
+          >
+            取消
+          </button>
+          <button
+            className={`inline-flex h-10 min-w-20 items-center justify-center rounded-md border px-4 text-sm font-semibold transition active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60 ${
+              confirmTone === "danger"
+                ? "border-rose-400/60 bg-[#2d191b] text-[#ffc3ca] hover:bg-[#3a1f22]"
+                : "border-[#4bae50]/70 bg-[#4bae50] text-white hover:bg-[#449b48]"
+            }`}
+            disabled={isBusy}
+            onClick={onConfirm}
+            type="button"
+          >
+            确认
+          </button>
+        </div>
+      </section>
+    </div>,
+    document.body
   );
 }
 
@@ -1776,20 +2043,24 @@ function TaskActionButton({
   danger = false,
   disabled = false,
   minWidth = false,
-  onClick
+  onClick,
+  variant = "default"
 }: {
   children: ReactNode;
   danger?: boolean;
   disabled?: boolean;
   minWidth?: boolean;
   onClick: () => void;
+  variant?: "default" | "edit";
 }) {
   return (
     <button
-      className={`inline-flex h-10 items-center justify-center rounded-md border px-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60 ${
+      className={`inline-flex h-10 items-center justify-center rounded-md border px-4 text-sm font-semibold transition active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60 ${
         danger
-          ? "border-rose-400/30 bg-rose-400/10 text-rose-200"
-          : "border-[var(--border)] bg-[var(--panel)] text-[var(--foreground)]"
+          ? "border-rose-400/60 bg-[#2d191b] text-[#ffc3ca] hover:bg-[#3a1f22]"
+          : variant === "edit"
+            ? "border-cyan-300/50 bg-[#17313a] text-[#bdefff] hover:bg-[#1d3d48]"
+            : "border-[var(--border)] bg-[var(--panel-strong)] text-[var(--foreground)] hover:bg-[var(--muted)]"
       } ${minWidth ? "min-w-24" : ""}`}
       disabled={disabled}
       onClick={onClick}
@@ -1966,6 +2237,81 @@ function formatDuration(totalMs: number) {
   return parts.slice(0, 2).join(" ");
 }
 
+function parseLocalDateTimeValue(value: string) {
+  const date = new Date(value);
+
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function getDefaultDeadlineDate() {
+  const defaultDate = new Date(Date.now() + HOUR_MS);
+
+  defaultDate.setSeconds(0, 0);
+  defaultDate.setMinutes(Math.ceil(defaultDate.getMinutes() / 5) * 5);
+
+  return defaultDate;
+}
+
+function isSamePickerDay(left: Date, right: Date) {
+  return (
+    left.getFullYear() === right.getFullYear() &&
+    left.getMonth() === right.getMonth() &&
+    left.getDate() === right.getDate()
+  );
+}
+
+function isPastCalendarDay(date: Date) {
+  const dayEnd = new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    23,
+    59,
+    59,
+    999
+  );
+
+  return dayEnd <= new Date();
+}
+
+function getCalendarDays(visibleMonth: Date): Array<Date | null> {
+  const year = visibleMonth.getFullYear();
+  const month = visibleMonth.getMonth();
+  const firstDay = new Date(year, month, 1);
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  return [
+    ...Array.from({ length: firstDay.getDay() }, () => null),
+    ...Array.from(
+      { length: daysInMonth },
+      (_, index) => new Date(year, month, index + 1)
+    )
+  ];
+}
+
+function getMonthTitle(date: Date) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    month: "long",
+    year: "numeric"
+  }).format(date);
+}
+
+function formatDateOnly(date: Date) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  }).format(date);
+}
+
+function formatTimeOnly(date: Date) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    hour: "2-digit",
+    hour12: false,
+    minute: "2-digit"
+  }).format(date);
+}
+
 function formatDateTime(date: Date) {
   return new Intl.DateTimeFormat("zh-CN", {
     month: "2-digit",
@@ -1992,6 +2338,9 @@ function createEmptyForm(): TaskFormState {
 function createDefaultDeadlineFields() {
   const startAt = new Date();
   const dueAt = new Date(startAt.getTime() + 24 * 60 * 60 * 1000);
+
+  dueAt.setSeconds(0, 0);
+  dueAt.setMinutes(Math.ceil(dueAt.getMinutes() / 5) * 5);
 
   return {
     startAt: toDatetimeLocalValue(startAt),
@@ -2107,6 +2456,12 @@ function upsertTask(tasks: TaskDto[], task: TaskDto) {
   return tasks.map((currentTask) =>
     currentTask.id === task.id ? task : currentTask
   );
+}
+
+function waitForUiAnimation(durationMs: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, durationMs);
+  });
 }
 
 function getApiError(data: ApiTaskResponse) {
