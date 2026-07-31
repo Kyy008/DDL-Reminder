@@ -1,7 +1,14 @@
 "use client";
 
-import type { FormEvent, ReactNode } from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { CSSProperties, FormEvent, ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState
+} from "react";
 import { createPortal } from "react-dom";
 import {
   calculateDeadlineProgress,
@@ -729,7 +736,6 @@ function TaskEditorForm({
               title: event.target.value
             }))
           }
-          required
           value={form.title}
         />
       </label>
@@ -820,7 +826,7 @@ function TaskEditorForm({
 
       <button
         className="h-11 min-w-28 self-start rounded-md bg-[var(--primary)] px-4 text-sm font-semibold text-[var(--primary-foreground)] transition hover:bg-[#dde6ff] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-60"
-        disabled={isSubmitting}
+        disabled={isSubmitting || !form.title.trim()}
         type="submit"
       >
         {isSubmitting ? submittingLabel : submitLabel}
@@ -837,6 +843,8 @@ function CalendarDatePicker({
   value: string;
 }) {
   const pickerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const initialDate =
     parseLocalDateTimeValue(value) ?? getDefaultDeadlineDate();
   const [isOpen, setIsOpen] = useState(false);
@@ -847,6 +855,11 @@ function CalendarDatePicker({
   const calendarDays = getCalendarDays(visibleMonth);
   const selectedValue = parseLocalDateTimeValue(value);
   const draftIsValid = draftDate > new Date();
+  const popoverStyle = useFloatingPickerPosition({
+    isOpen,
+    popoverRef,
+    triggerRef
+  });
 
   useEffect(() => {
     if (!isOpen) {
@@ -854,7 +867,12 @@ function CalendarDatePicker({
     }
 
     function handlePointerDown(event: PointerEvent) {
-      if (!pickerRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+
+      if (
+        !pickerRef.current?.contains(target) &&
+        !popoverRef.current?.contains(target)
+      ) {
         setIsOpen(false);
       }
     }
@@ -916,134 +934,260 @@ function CalendarDatePicker({
         aria-label="选择截止日期"
         className="date-picker-trigger"
         onClick={togglePicker}
+        ref={triggerRef}
         type="button"
       >
         {selectedValue ? formatDateOnly(selectedValue) : "选择日期"}
       </button>
 
-      {isOpen ? (
-        <div
-          aria-label="选择截止日期"
-          className="date-picker-popover"
-          role="dialog"
-        >
-          <div className="calendar-header">
-            <button
-              aria-label="上一年"
-              className="calendar-jump-button"
-              onClick={() =>
-                setVisibleMonth(
-                  new Date(
-                    visibleMonth.getFullYear() - 1,
-                    visibleMonth.getMonth(),
-                    1
-                  )
-                )
-              }
-              type="button"
+      {isOpen
+        ? createPortal(
+            <div
+              aria-label="选择截止日期"
+              className="date-picker-popover date-picker-popover-floating"
+              ref={popoverRef}
+              role="dialog"
+              style={popoverStyle}
             >
-              «
-            </button>
-            <div className="calendar-month-controls">
-              <button
-                aria-label="上一月"
-                onClick={() =>
-                  setVisibleMonth(
-                    new Date(
-                      visibleMonth.getFullYear(),
-                      visibleMonth.getMonth() - 1,
-                      1
-                    )
-                  )
-                }
-                type="button"
-              >
-                ‹
-              </button>
-              <strong>{getMonthTitle(visibleMonth)}</strong>
-              <button
-                aria-label="下一月"
-                onClick={() =>
-                  setVisibleMonth(
-                    new Date(
-                      visibleMonth.getFullYear(),
-                      visibleMonth.getMonth() + 1,
-                      1
-                    )
-                  )
-                }
-                type="button"
-              >
-                ›
-              </button>
-            </div>
-            <button
-              aria-label="下一年"
-              className="calendar-jump-button"
-              onClick={() =>
-                setVisibleMonth(
-                  new Date(
-                    visibleMonth.getFullYear() + 1,
-                    visibleMonth.getMonth(),
-                    1
-                  )
-                )
-              }
-              type="button"
-            >
-              »
-            </button>
-          </div>
-
-          <div className="calendar-weekdays">
-            {["日", "一", "二", "三", "四", "五", "六"].map((dayName) => (
-              <span key={dayName}>{dayName}</span>
-            ))}
-          </div>
-
-          <div className="calendar-grid">
-            {calendarDays.map((day, index) => {
-              if (!day) {
-                return <span className="calendar-empty-day" key={index} />;
-              }
-
-              const disabled = isPastCalendarDay(day);
-              const selected = isSamePickerDay(day, draftDate);
-
-              return (
+              <div className="calendar-header">
                 <button
-                  className={selected ? "selected" : ""}
-                  disabled={disabled}
-                  key={day.toISOString()}
-                  onClick={() => updateDraftDay(day)}
+                  aria-label="上一年"
+                  className="calendar-jump-button"
+                  onClick={() =>
+                    setVisibleMonth(
+                      new Date(
+                        visibleMonth.getFullYear() - 1,
+                        visibleMonth.getMonth(),
+                        1
+                      )
+                    )
+                  }
                   type="button"
                 >
-                  {day.getDate()}
+                  «
                 </button>
-              );
-            })}
-          </div>
+                <div className="calendar-month-controls">
+                  <button
+                    aria-label="上一月"
+                    onClick={() =>
+                      setVisibleMonth(
+                        new Date(
+                          visibleMonth.getFullYear(),
+                          visibleMonth.getMonth() - 1,
+                          1
+                        )
+                      )
+                    }
+                    type="button"
+                  >
+                    ‹
+                  </button>
+                  <strong>{getMonthTitle(visibleMonth)}</strong>
+                  <button
+                    aria-label="下一月"
+                    onClick={() =>
+                      setVisibleMonth(
+                        new Date(
+                          visibleMonth.getFullYear(),
+                          visibleMonth.getMonth() + 1,
+                          1
+                        )
+                      )
+                    }
+                    type="button"
+                  >
+                    ›
+                  </button>
+                </div>
+                <button
+                  aria-label="下一年"
+                  className="calendar-jump-button"
+                  onClick={() =>
+                    setVisibleMonth(
+                      new Date(
+                        visibleMonth.getFullYear() + 1,
+                        visibleMonth.getMonth(),
+                        1
+                      )
+                    )
+                  }
+                  type="button"
+                >
+                  »
+                </button>
+              </div>
 
-          {!draftIsValid ? (
-            <p className="calendar-error">截止日期必须晚于当前时间。</p>
-          ) : null}
+              <div className="calendar-weekdays">
+                {["日", "一", "二", "三", "四", "五", "六"].map((dayName) => (
+                  <span key={dayName}>{dayName}</span>
+                ))}
+              </div>
 
-          <div className="calendar-actions">
-            <button onClick={() => setIsOpen(false)} type="button">
-              取消
-            </button>
-            <button
-              disabled={!draftIsValid}
-              onClick={commitDraft}
-              type="button"
-            >
-              确认
-            </button>
-          </div>
-        </div>
-      ) : null}
+              <div className="calendar-grid">
+                {calendarDays.map((day, index) => {
+                  if (!day) {
+                    return <span className="calendar-empty-day" key={index} />;
+                  }
+
+                  const disabled = isPastCalendarDay(day);
+                  const selected = isSamePickerDay(day, draftDate);
+
+                  return (
+                    <button
+                      className={selected ? "selected" : ""}
+                      disabled={disabled}
+                      key={day.toISOString()}
+                      onClick={() => updateDraftDay(day)}
+                      type="button"
+                    >
+                      {day.getDate()}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {!draftIsValid ? (
+                <p className="calendar-error">截止日期必须晚于当前时间。</p>
+              ) : null}
+
+              <div className="calendar-actions">
+                <button onClick={() => setIsOpen(false)} type="button">
+                  取消
+                </button>
+                <button
+                  disabled={!draftIsValid}
+                  onClick={commitDraft}
+                  type="button"
+                >
+                  确认
+                </button>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
+}
+
+function useFloatingPickerPosition({
+  isOpen,
+  popoverRef,
+  triggerRef
+}: {
+  isOpen: boolean;
+  popoverRef: { current: HTMLDivElement | null };
+  triggerRef: { current: HTMLButtonElement | null };
+}) {
+  const [style, setStyle] = useState<CSSProperties>({
+    bottom: "auto",
+    left: 12,
+    maxHeight: "calc(100dvh - 24px)",
+    overflowY: "auto",
+    position: "fixed",
+    right: "auto",
+    top: 12,
+    visibility: "hidden"
+  });
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const viewportPadding = 12;
+    const triggerGap = 8;
+
+    function updatePosition() {
+      const trigger = triggerRef.current;
+      const popover = popoverRef.current;
+
+      if (!trigger || !popover) {
+        return;
+      }
+
+      const triggerRect = trigger.getBoundingClientRect();
+      const popoverRect = popover.getBoundingClientRect();
+      const naturalHeight = popover.scrollHeight;
+      const boundedTriggerTop = Math.min(
+        Math.max(triggerRect.top, viewportPadding),
+        window.innerHeight - viewportPadding
+      );
+      const boundedTriggerBottom = Math.min(
+        Math.max(triggerRect.bottom, viewportPadding),
+        window.innerHeight - viewportPadding
+      );
+      const availableBelow = Math.max(
+        0,
+        window.innerHeight - boundedTriggerBottom - triggerGap - viewportPadding
+      );
+      const availableAbove = Math.max(
+        0,
+        boundedTriggerTop - triggerGap - viewportPadding
+      );
+      const viewportAvailableHeight = window.innerHeight - viewportPadding * 2;
+      const openAbove = availableAbove >= naturalHeight;
+      const openBelow = !openAbove && availableBelow >= naturalHeight;
+      const useViewportPlacement = !openAbove && !openBelow;
+      const availableHeight = useViewportPlacement
+        ? viewportAvailableHeight
+        : openAbove
+          ? availableAbove
+          : availableBelow;
+      const minimumHeight = Math.min(120, viewportAvailableHeight);
+      const maxHeight = Math.max(
+        minimumHeight,
+        Math.min(viewportAvailableHeight, availableHeight)
+      );
+      const renderedHeight = Math.min(naturalHeight, maxHeight);
+      const candidateTop = useViewportPlacement
+        ? Math.max(viewportPadding, (window.innerHeight - renderedHeight) / 2)
+        : openAbove
+          ? boundedTriggerTop - triggerGap - renderedHeight
+          : boundedTriggerBottom + triggerGap;
+      const maxTop = window.innerHeight - viewportPadding - renderedHeight;
+      const top = Math.max(
+        viewportPadding,
+        Math.min(candidateTop, Math.max(viewportPadding, maxTop))
+      );
+      const maxLeft = window.innerWidth - viewportPadding - popoverRect.width;
+      const left = Math.max(
+        viewportPadding,
+        Math.min(triggerRect.right - popoverRect.width, maxLeft)
+      );
+
+      setStyle({
+        bottom: "auto",
+        left,
+        maxHeight,
+        overflowY: naturalHeight > maxHeight ? "auto" : "visible",
+        overscrollBehavior: "contain",
+        position: "fixed",
+        right: "auto",
+        top,
+        visibility: "visible"
+      });
+    }
+
+    const frame = window.requestAnimationFrame(updatePosition);
+    const resizeObserver = new ResizeObserver(updatePosition);
+
+    if (popoverRef.current) {
+      resizeObserver.observe(popoverRef.current);
+    }
+
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [isOpen, popoverRef, triggerRef]);
+
+  return style;
 }
 
 function TimePicker({
@@ -1054,6 +1198,8 @@ function TimePicker({
   value: string;
 }) {
   const pickerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const initialDate =
     parseLocalDateTimeValue(value) ?? getDefaultDeadlineDate();
   const [isOpen, setIsOpen] = useState(false);
@@ -1066,6 +1212,11 @@ function TimePicker({
       draftDate.getMinutes()
     ])
   ).sort((left, right) => left - right);
+  const popoverStyle = useFloatingPickerPosition({
+    isOpen,
+    popoverRef,
+    triggerRef
+  });
 
   useEffect(() => {
     if (!isOpen) {
@@ -1073,7 +1224,12 @@ function TimePicker({
     }
 
     function handlePointerDown(event: PointerEvent) {
-      if (!pickerRef.current?.contains(event.target as Node)) {
+      const target = event.target as Node;
+
+      if (
+        !pickerRef.current?.contains(target) &&
+        !popoverRef.current?.contains(target)
+      ) {
         setIsOpen(false);
       }
     }
@@ -1132,76 +1288,82 @@ function TimePicker({
         aria-label="选择截止时间"
         className="date-picker-trigger"
         onClick={togglePicker}
+        ref={triggerRef}
         type="button"
       >
         {selectedValue ? formatTimeOnly(selectedValue) : "选择时间"}
       </button>
 
-      {isOpen ? (
-        <div
-          aria-label="选择截止时间"
-          className="date-picker-popover time-picker-popover"
-          role="dialog"
-        >
-          <div className="time-picker-row">
-            <label>
-              <span>时</span>
-              <select
-                onChange={(event) =>
-                  updateDraftTime("hour", event.target.value)
-                }
-                value={String(draftDate.getHours()).padStart(2, "0")}
-              >
-                {Array.from({ length: 24 }, (_, hour) => {
-                  const optionValue = String(hour).padStart(2, "0");
-
-                  return (
-                    <option key={optionValue} value={optionValue}>
-                      {optionValue}
-                    </option>
-                  );
-                })}
-              </select>
-            </label>
-            <label>
-              <span>分</span>
-              <select
-                onChange={(event) =>
-                  updateDraftTime("minute", event.target.value)
-                }
-                value={String(draftDate.getMinutes()).padStart(2, "0")}
-              >
-                {minuteOptions.map((minute) => {
-                  const optionValue = String(minute).padStart(2, "0");
-
-                  return (
-                    <option key={optionValue} value={optionValue}>
-                      {optionValue}
-                    </option>
-                  );
-                })}
-              </select>
-            </label>
-          </div>
-
-          {!draftIsValid ? (
-            <p className="calendar-error">截止时间必须晚于当前时间。</p>
-          ) : null}
-
-          <div className="calendar-actions">
-            <button onClick={() => setIsOpen(false)} type="button">
-              取消
-            </button>
-            <button
-              disabled={!draftIsValid}
-              onClick={commitDraft}
-              type="button"
+      {isOpen
+        ? createPortal(
+            <div
+              aria-label="选择截止时间"
+              className="date-picker-popover date-picker-popover-floating time-picker-popover"
+              ref={popoverRef}
+              role="dialog"
+              style={popoverStyle}
             >
-              确认
-            </button>
-          </div>
-        </div>
-      ) : null}
+              <div className="time-picker-row">
+                <label>
+                  <span>时</span>
+                  <select
+                    onChange={(event) =>
+                      updateDraftTime("hour", event.target.value)
+                    }
+                    value={String(draftDate.getHours()).padStart(2, "0")}
+                  >
+                    {Array.from({ length: 24 }, (_, hour) => {
+                      const optionValue = String(hour).padStart(2, "0");
+
+                      return (
+                        <option key={optionValue} value={optionValue}>
+                          {optionValue}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </label>
+                <label>
+                  <span>分</span>
+                  <select
+                    onChange={(event) =>
+                      updateDraftTime("minute", event.target.value)
+                    }
+                    value={String(draftDate.getMinutes()).padStart(2, "0")}
+                  >
+                    {minuteOptions.map((minute) => {
+                      const optionValue = String(minute).padStart(2, "0");
+
+                      return (
+                        <option key={optionValue} value={optionValue}>
+                          {optionValue}
+                        </option>
+                      );
+                    })}
+                  </select>
+                </label>
+              </div>
+
+              {!draftIsValid ? (
+                <p className="calendar-error">截止时间必须晚于当前时间。</p>
+              ) : null}
+
+              <div className="calendar-actions">
+                <button onClick={() => setIsOpen(false)} type="button">
+                  取消
+                </button>
+                <button
+                  disabled={!draftIsValid}
+                  onClick={commitDraft}
+                  type="button"
+                >
+                  确认
+                </button>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
     </div>
   );
 }
@@ -1552,9 +1714,6 @@ function SettingsPanel({
       <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold">提醒设置</h1>
-          <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-            设置邮件提醒以及任务进入临近、紧急状态的时间阈值。
-          </p>
         </div>
         <div className="flex items-center gap-2">
           {hasChanges ? (

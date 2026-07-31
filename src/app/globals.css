@@ -350,6 +350,10 @@ a {
   padding: 14px;
 }
 
+.date-picker-popover-floating {
+  scrollbar-gutter: stable;
+}
+
 .time-picker-popover {
   width: min(260px, calc(100vw - 48px));
 }
@@ -527,6 +531,53 @@ a {
 .calendar-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.48;
+}
+
+@media (max-height: 620px) {
+  .date-picker-popover-floating {
+    padding: 10px;
+  }
+
+  .date-picker-popover-floating .calendar-header {
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+
+  .date-picker-popover-floating .calendar-header button {
+    width: 30px;
+    height: 30px;
+    font-size: 18px;
+  }
+
+  .date-picker-popover-floating .calendar-month-controls {
+    gap: 4px;
+  }
+
+  .date-picker-popover-floating .calendar-month-controls strong {
+    min-width: 96px;
+  }
+
+  .date-picker-popover-floating .calendar-weekdays,
+  .date-picker-popover-floating .calendar-grid {
+    gap: 4px;
+  }
+
+  .date-picker-popover-floating .calendar-weekdays {
+    margin-bottom: 4px;
+  }
+
+  .date-picker-popover-floating .calendar-empty-day,
+  .date-picker-popover-floating .calendar-grid button {
+    min-height: 28px;
+  }
+
+  .date-picker-popover-floating .calendar-actions {
+    margin-top: 8px;
+  }
+
+  .date-picker-popover-floating .calendar-actions button {
+    min-height: 32px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

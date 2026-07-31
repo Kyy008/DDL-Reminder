@@ -143,10 +143,7 @@ export default function CalendarView({ tasks }: { tasks: CalendarTask[] }) {
   function finishMonthTransition(transitionKey: number) {
     const completedTransition = monthTransitionRef.current;
 
-    if (
-      !completedTransition ||
-      completedTransition.key !== transitionKey
-    ) {
+    if (!completedTransition || completedTransition.key !== transitionKey) {
       return;
     }
 
@@ -209,9 +206,7 @@ export default function CalendarView({ tasks }: { tasks: CalendarTask[] }) {
           addMonths(centerMonth, 1),
           addMonths(centerMonth, 2)
         ]
-    : [-2, -1, 0, 1, 2].map((offset) =>
-        addMonths(centerMonth, offset)
-      );
+    : [-2, -1, 0, 1, 2].map((offset) => addMonths(centerMonth, offset));
   const activeSlideIndex = monthTransition
     ? monthTransition.direction === 1
       ? 3
@@ -224,9 +219,6 @@ export default function CalendarView({ tasks }: { tasks: CalendarTask[] }) {
         <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold">任务日历</h1>
-            <p className="mt-1 text-sm text-[var(--muted-foreground)]">
-              按截止日期查看任务，点击日期可查看当天安排。
-            </p>
           </div>
           <YearMonthPicker
             month={centerMonth}
@@ -263,8 +255,7 @@ export default function CalendarView({ tasks }: { tasks: CalendarTask[] }) {
           >
             {slideMonths.map((month, index) => {
               const isActive = index === activeSlideIndex;
-              const isNeighbor =
-                Math.abs(index - activeSlideIndex) === 1;
+              const isNeighbor = Math.abs(index - activeSlideIndex) === 1;
 
               return (
                 <div
@@ -479,9 +470,7 @@ function MonthCard({
     <article
       aria-hidden={!isActive}
       className={`calendar-month-card rounded-xl border bg-[var(--glass-panel-strong)] p-3 shadow-xl sm:p-5 ${
-        isActive
-          ? "border-[var(--primary)]/70"
-          : "border-[var(--border)]"
+        isActive ? "border-[var(--primary)]/70" : "border-[var(--border)]"
       }`}
     >
       <h2 className="mb-3 text-center text-lg font-bold">
@@ -530,9 +519,7 @@ function MonthCard({
               type="button"
             >
               <span className="relative z-10">{day.getDate()}</span>
-              {dayTasks.length > 0 ? (
-                <TaskStatusDots tasks={dayTasks} />
-              ) : null}
+              {dayTasks.length > 0 ? <TaskStatusDots tasks={dayTasks} /> : null}
             </button>
           );
         })}
@@ -656,7 +643,9 @@ function DayTasksDialog({
                     </div>
                     <p className="mt-2 text-sm text-[var(--muted-foreground)]">
                       截止时间：
-                      {task.dueDate ? formatFullDateTime(task.dueDate) : "未设置"}
+                      {task.dueDate
+                        ? formatFullDateTime(task.dueDate)
+                        : "未设置"}
                     </p>
                   </div>
                 </article>
@@ -670,13 +659,7 @@ function DayTasksDialog({
   );
 }
 
-function RecentTimeline({
-  now,
-  tasks
-}: {
-  now: Date;
-  tasks: CalendarTask[];
-}) {
+function RecentTimeline({ now, tasks }: { now: Date; tasks: CalendarTask[] }) {
   const timelineScrollRef = useRef<HTMLDivElement>(null);
   const nowMs = now.getTime();
   const startMs = nowMs - TIMELINE_HALF_HOURS * HOUR_MS;
@@ -906,8 +889,7 @@ function getMostUrgentMeta(tasks: CalendarTask[]) {
     archived: 0
   };
   const mostUrgentTask = tasks.reduce((mostUrgent, task) =>
-    urgencyRank[task.deadlineStatus] >
-    urgencyRank[mostUrgent.deadlineStatus]
+    urgencyRank[task.deadlineStatus] > urgencyRank[mostUrgent.deadlineStatus]
       ? task
       : mostUrgent
   );
