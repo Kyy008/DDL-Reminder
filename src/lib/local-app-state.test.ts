@@ -74,6 +74,25 @@ describe("local app state", () => {
     expect(result.task.dueAt).toBe("2026-04-30T10:01:00.000Z");
   });
 
+  it.each(["2026-04-30T10:00:00.000Z", "2026-04-30T09:59:00.000Z"])(
+    "rejects a deadline at or before the actual creation time (%s)",
+    (dueAt) => {
+      expect(() =>
+        createTaskInState(
+          createEmptyLocalAppState(),
+          {
+            title: "Invalid short deadline",
+            dueAt
+          },
+          {
+            id: "task_1",
+            now: NOW
+          }
+        )
+      ).toThrow(TASK_ERROR_MESSAGES.deadlineNotFuture);
+    }
+  );
+
   it("rejects duplicate task titles", () => {
     const initial = createTaskInState(
       createEmptyLocalAppState(),
@@ -183,6 +202,33 @@ describe("local app state", () => {
 
     expect(updated.task.startAt).toBe(NOW.toISOString());
     expect(updated.task.dueAt).toBe("2026-05-01T10:00:00.000Z");
+  });
+
+  it("allows editing an overdue deadline when it remains after the task start", () => {
+    const created = createTaskInState(
+      createEmptyLocalAppState(),
+      {
+        title: "Overdue task",
+        dueAt: "2026-05-01T10:00:00.000Z"
+      },
+      {
+        id: "task_1",
+        now: NOW
+      }
+    );
+    const updated = updateTaskInState(
+      created.state,
+      created.task.id,
+      {
+        dueAt: "2026-04-30T11:00:00.000Z"
+      },
+      {
+        now: new Date("2026-05-02T10:00:00.000Z")
+      }
+    );
+
+    expect(updated.task.startAt).toBe(NOW.toISOString());
+    expect(updated.task.dueAt).toBe("2026-04-30T11:00:00.000Z");
   });
 
   it("updates local notification settings", () => {

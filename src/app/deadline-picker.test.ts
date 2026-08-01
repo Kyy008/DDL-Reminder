@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getTimePickerMinuteOptions,
+  updateDatePickerDate,
   updateTimePickerDate
 } from "./deadline-picker";
 
@@ -35,5 +36,17 @@ describe("custom deadline time picker", () => {
     expect(updateTimePickerDate(original, "hour", -1).getHours()).toBe(0);
     expect(updateTimePickerDate(original, "minute", 99).getMinutes()).toBe(59);
     expect(updateTimePickerDate(original, "minute", -1).getMinutes()).toBe(0);
+  });
+
+  it("allows changing to today before choosing a later time", () => {
+    const defaultDeadline = new Date(2026, 7, 3, 4, 37);
+    const today = new Date(2026, 7, 2);
+    const changedDate = updateDatePickerDate(defaultDeadline, today);
+
+    expect(changedDate.getFullYear()).toBe(2026);
+    expect(changedDate.getMonth()).toBe(7);
+    expect(changedDate.getDate()).toBe(2);
+    expect(changedDate.getHours()).toBe(4);
+    expect(changedDate.getMinutes()).toBe(37);
   });
 });

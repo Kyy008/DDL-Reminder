@@ -121,7 +121,9 @@ export function createTaskInState(
   if (hasDeadline && (!dueAt || !isValidTaskDateRange(startAt, dueAt))) {
     throw new LocalAppStateError(
       dueAt
-        ? TASK_ERROR_MESSAGES.dateRangeInvalid
+        ? parsed.data.startAt
+          ? TASK_ERROR_MESSAGES.dateRangeInvalid
+          : TASK_ERROR_MESSAGES.deadlineNotFuture
         : TASK_ERROR_MESSAGES.dateInvalid
     );
   }

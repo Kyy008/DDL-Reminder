@@ -50,7 +50,6 @@ function CalendarDatePicker({ onChange, value }: DeadlinePickerProps) {
   );
   const calendarDays = getCalendarDays(visibleMonth);
   const selectedValue = parseLocalDateTimeValue(value);
-  const draftIsValid = isFutureDate(draftDate);
   const popoverStyle = useFloatingPickerPosition({
     isOpen,
     popoverRef,
@@ -141,22 +140,10 @@ function CalendarDatePicker({ onChange, value }: DeadlinePickerProps) {
   }
 
   function updateDraftDay(day: Date) {
-    setDraftDate(
-      new Date(
-        day.getFullYear(),
-        day.getMonth(),
-        day.getDate(),
-        draftDate.getHours(),
-        draftDate.getMinutes()
-      )
-    );
+    setDraftDate(updateDatePickerDate(draftDate, day));
   }
 
   function commitDraft() {
-    if (!isFutureDate(draftDate)) {
-      return;
-    }
-
     onChange(toDatetimeLocalValue(draftDate));
     setIsOpen(false);
     triggerRef.current?.focus();
@@ -289,18 +276,7 @@ function CalendarDatePicker({ onChange, value }: DeadlinePickerProps) {
                 })}
               </div>
 
-              {!draftIsValid ? (
-                <p
-                  aria-live="polite"
-                  className="deadline-picker-error"
-                  role="status"
-                >
-                  所选截止时间必须晚于当前时间。
-                </p>
-              ) : null}
-
               <PickerActions
-                canCommit={draftIsValid}
                 onCancel={() => {
                   setIsOpen(false);
                   triggerRef.current?.focus();
@@ -323,9 +299,7 @@ function TimePicker({ onChange, value }: DeadlinePickerProps) {
     parseLocalDateTimeValue(value) ?? getDefaultDeadlineDate();
   const [isOpen, setIsOpen] = useState(false);
   const [draftDate, setDraftDate] = useState(initialDate);
-  const [validationNow, setValidationNow] = useState(() => Date.now());
   const selectedValue = parseLocalDateTimeValue(value);
-  const draftIsValid = draftDate.getTime() > validationNow;
   const hourOptions = Array.from({ length: 24 }, (_, hour) => hour);
   const minuteOptions = getTimePickerMinuteOptions(draftDate.getMinutes());
   const popoverStyle = useFloatingPickerPosition({
@@ -406,19 +380,6 @@ function TimePicker({ onChange, value }: DeadlinePickerProps) {
     };
   }, [isOpen]);
 
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    const timer = window.setInterval(
-      () => setValidationNow(Date.now()),
-      30_000
-    );
-
-    return () => window.clearInterval(timer);
-  }, [isOpen]);
-
   function togglePicker() {
     if (isOpen) {
       setIsOpen(false);
@@ -426,7 +387,6 @@ function TimePicker({ onChange, value }: DeadlinePickerProps) {
     }
 
     setDraftDate(parseLocalDateTimeValue(value) ?? getDefaultDeadlineDate());
-    setValidationNow(Date.now());
     setIsOpen(true);
   }
 
@@ -437,11 +397,6 @@ function TimePicker({ onChange, value }: DeadlinePickerProps) {
   }
 
   function commitDraft() {
-    if (!isFutureDate(draftDate)) {
-      setValidationNow(Date.now());
-      return;
-    }
-
     onChange(toDatetimeLocalValue(draftDate));
     setIsOpen(false);
     triggerRef.current?.focus();
@@ -495,18 +450,7 @@ function TimePicker({ onChange, value }: DeadlinePickerProps) {
                 />
               </div>
 
-              {!draftIsValid ? (
-                <p
-                  aria-live="polite"
-                  className="deadline-picker-error"
-                  role="status"
-                >
-                  所选截止时间必须晚于当前时间。
-                </p>
-              ) : null}
-
               <PickerActions
-                canCommit={draftIsValid}
                 onCancel={() => {
                   setIsOpen(false);
                   triggerRef.current?.focus();
@@ -683,11 +627,9 @@ export function TimeWheelColumn({
 }
 
 function PickerActions({
-  canCommit,
   onCancel,
   onCommit
 }: {
-  canCommit: boolean;
   onCancel: () => void;
   onCommit: () => void;
 }) {
@@ -696,7 +638,7 @@ function PickerActions({
       <button onClick={onCancel} type="button">
         取消
       </button>
-      <button disabled={!canCommit} onClick={onCommit} type="button">
+      <button onClick={onCommit} type="button">
         确认
       </button>
     </div>
@@ -849,6 +791,16 @@ export function updateTimePickerDate(
   return nextDate;
 }
 
+export function updateDatePickerDate(date: Date, selectedDay: Date) {
+  return new Date(
+    selectedDay.getFullYear(),
+    selectedDay.getMonth(),
+    selectedDay.getDate(),
+    date.getHours(),
+    date.getMinutes()
+  );
+}
+
 function parseLocalDateTimeValue(value: string) {
   if (!value) {
     return null;
@@ -865,10 +817,6 @@ function getDefaultDeadlineDate() {
   defaultDate.setSeconds(0, 0);
 
   return defaultDate;
-}
-
-function isFutureDate(date: Date) {
-  return date.getTime() > Date.now();
 }
 
 function isSamePickerDay(left: Date, right: Date) {
