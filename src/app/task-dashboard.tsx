@@ -6,6 +6,11 @@ import { createPortal } from "react-dom";
 import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
 import {
+  canControlAndroidRecents,
+  getAndroidRecentsExcluded,
+  setAndroidRecentsExcluded
+} from "@/lib/android-recents";
+import {
   calculateDeadlineProgress,
   DAY_MS,
   DeadlineStatus,
@@ -181,6 +186,10 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
     useState<ReminderSettings>(DEFAULT_REMINDER_SETTINGS);
   const [isSettingsLoading, setIsSettingsLoading] = useState(false);
   const [isSettingsSaving, setIsSettingsSaving] = useState(false);
+  const [canHideFromRecents, setCanHideFromRecents] = useState(false);
+  const [hideFromRecents, setHideFromRecents] = useState(false);
+  const [isRecentsSettingLoading, setIsRecentsSettingLoading] = useState(true);
+  const [isRecentsSettingSaving, setIsRecentsSettingSaving] = useState(false);
   const [now, setNow] = useState(() => new Date());
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(
     null
@@ -293,6 +302,49 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
     }
 
     void loadSettings();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [isManageMode]);
+
+  useEffect(() => {
+    if (!isManageMode) {
+      return;
+    }
+
+    const canControlRecents = canControlAndroidRecents();
+    let isCurrent = true;
+
+    setCanHideFromRecents(canControlRecents);
+
+    if (!canControlRecents) {
+      setIsRecentsSettingLoading(false);
+      return;
+    }
+
+    async function loadRecentsSetting() {
+      setIsRecentsSettingLoading(true);
+
+      try {
+        const isExcluded = await getAndroidRecentsExcluded();
+
+        if (isCurrent) {
+          setHideFromRecents(isExcluded);
+        }
+      } catch {
+        if (isCurrent) {
+          setIsErrorTone(true);
+          setError("后台卡片设置没能读取，请稍后重试。");
+        }
+      } finally {
+        if (isCurrent) {
+          setIsRecentsSettingLoading(false);
+        }
+      }
+    }
+
+    void loadRecentsSetting();
 
     return () => {
       isCurrent = false;
@@ -584,6 +636,24 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
     }
   }
 
+  async function toggleHideFromRecents() {
+    if (isRecentsSettingLoading || isRecentsSettingSaving) {
+      return;
+    }
+
+    setIsRecentsSettingSaving(true);
+    setError(null);
+    setIsErrorTone(true);
+
+    try {
+      setHideFromRecents(await setAndroidRecentsExcluded(!hideFromRecents));
+    } catch {
+      setError("后台卡片设置没能更改，请稍后重试。");
+    } finally {
+      setIsRecentsSettingSaving(false);
+    }
+  }
+
   if (!isManageMode) {
     return (
       <div className="flex flex-col gap-8">
@@ -647,8 +717,13 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
           {activeAction === "settings" ? (
             <section className="mx-auto w-full max-w-4xl">
               <SettingsPanel
+                canHideFromRecents={canHideFromRecents}
                 hasChanges={settingsHaveChanges}
+                hideFromRecents={hideFromRecents}
                 isEmailReminderPending={isSettingsLoading || isSettingsSaving}
+                isRecentsSettingPending={
+                  isRecentsSettingLoading || isRecentsSettingSaving
+                }
                 isSaving={isSettingsSaving}
                 isThresholdOrderValid={reminderThresholdOrderIsValid}
                 settings={draftReminderSettings}
@@ -656,6 +731,7 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
                   setDraftReminderSettings(appliedReminderSettings)
                 }
                 onChange={setDraftReminderSettings}
+                onToggleHideFromRecents={() => void toggleHideFromRecents()}
                 onSave={() => void saveReminderSettings()}
               />
             </section>
@@ -1275,17 +1351,24 @@ function SidebarIcon({
 }
 
 function SettingsPanel({
+  canHideFromRecents,
   hasChanges,
+  hideFromRecents,
   isEmailReminderPending,
+  isRecentsSettingPending,
   isSaving,
   isThresholdOrderValid,
   onCancel,
   onChange,
   onSave,
+  onToggleHideFromRecents,
   settings
 }: {
+  canHideFromRecents: boolean;
   hasChanges: boolean;
+  hideFromRecents: boolean;
   isEmailReminderPending: boolean;
+  isRecentsSettingPending: boolean;
   isSaving: boolean;
   isThresholdOrderValid: boolean;
   onCancel: () => void;
@@ -1293,6 +1376,7 @@ function SettingsPanel({
     update: (currentSettings: ReminderSettings) => ReminderSettings
   ) => void;
   onSave: () => void;
+  onToggleHideFromRecents: () => void;
   settings: ReminderSettings;
 }) {
   return (
@@ -1395,6 +1479,39 @@ function SettingsPanel({
           </div>
         </div>
       </section>
+
+      {canHideFromRecents ? (
+        <section className="glass-panel rounded-xl border border-[var(--border)] px-5 shadow-2xl shadow-black/20 sm:px-7">
+          <div className="flex items-center justify-between gap-5 py-5">
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold">隐藏后台卡片</h2>
+              <p className="mt-1 text-sm leading-6 text-[var(--muted-foreground)]">
+                开启后，DDL-Reminder
+                不会出现在系统最近任务中。桌面图标照常能打开，任务提醒也不受影响。
+              </p>
+            </div>
+            <button
+              aria-checked={hideFromRecents}
+              aria-label="隐藏系统最近任务中的应用卡片"
+              className={`relative h-7 w-12 shrink-0 rounded-full border transition ${
+                hideFromRecents
+                  ? "border-[var(--primary)] bg-[var(--primary)]"
+                  : "border-[var(--border)] bg-[var(--muted)]"
+              } disabled:cursor-not-allowed disabled:opacity-60`}
+              disabled={isRecentsSettingPending}
+              onClick={onToggleHideFromRecents}
+              role="switch"
+              type="button"
+            >
+              <span
+                className={`absolute left-1 top-1 size-5 rounded-full bg-[var(--background)] transition-transform ${
+                  hideFromRecents ? "translate-x-5" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       <div className="glass-panel rounded-xl border border-[var(--border)] px-5 shadow-2xl shadow-black/20 sm:px-7">
         <WallpaperSettings />

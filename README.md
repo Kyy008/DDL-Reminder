@@ -1,41 +1,33 @@
 # DDL-Reminder-Android
 
-一款本地运行的 Android DDL 任务管理与通知提醒应用。项目使用 Next.js 构建界面，通过 Capacitor 打包为原生 Android App；任务、设置和壁纸信息保存在设备本地，不依赖账号、服务器或云数据库。
+这是一个给 Android 用的 DDL 任务提醒 App。任务、设置和壁纸都只保存在手机里，不需要登录，也不依赖服务器或云数据库。
 
-## 功能
+## 现在能做什么
 
-- 创建、编辑、完成和删除任务，并显示临近截止、紧急和已完成状态
-- 支持不设置截止时间，以及精确到分钟的日期时间选择
-- 任务日历、按日任务详情和近期任务时间线
-- 手机横屏时以等宽双栏展示任务日历与竖向近期任务
-- Android 本地通知、精确闹钟检测和提醒重建
-- 针对荣耀、华为、小米、OPPO/一加/realme、vivo/iQOO、三星、魅族、华硕及 Pixel/AOSP 提供后台运行设置指引
-- 自定义壁纸、浅色/深色主题和系统栏配色
-- 所有应用数据均保存在本机
+- 创建、编辑、完成和删除任务，并区分临近截止、紧急和已完成状态
+- 截止时间可以不填，也可以精确设置到某一分钟
+- 用日历查看每天的任务，也可以在时间线里查看近期任务
+- 使用 Android 本地通知提醒任务，并在手机重启后重新安排提醒
+- 检查精确闹钟权限，并根据手机品牌给出自启动、后台运行和电池优化设置指引
+- 更换背景壁纸，切换浅色或深色主题，并让系统栏颜色跟随界面
+- 可以隐藏系统最近任务里的 App 卡片，不影响任务提醒
 
-## 技术栈
+## 它是怎么做的
 
-- Next.js 16、React 19、TypeScript
-- Tailwind CSS 4
-- Capacitor 8
-- Android SDK 36、Java 21、Gradle
-- Vitest、ESLint、Prettier
+界面使用 Next.js 16、React 19、TypeScript 和 Tailwind CSS 4，之后通过 Capacitor 8 打包成 Android App。通知、闹钟、厂商设置入口和壁纸处理等功能由 Android 原生代码完成。
 
-## 环境要求
+Android 工程目前使用 SDK 36、Build Tools 36.0.0 和 JDK 21。项目里的测试与代码检查使用 Vitest、ESLint 和 Prettier。
 
-- Node.js 22 或更高版本
-- JDK 21
-- Android SDK 36 与 Build Tools 36.0.0
-- Android Studio（可选，用于调试原生工程）
+## 想在电脑上跑起来
 
-## 本地开发
+先准备好 Node.js 22 或更高版本。只看网页界面时，运行：
 
 ```bash
 npm ci
 npm run dev
 ```
 
-常用检查：
+平时可以用下面这些命令检查代码：
 
 ```bash
 npm run lint
@@ -44,41 +36,43 @@ npm run format
 npm run build
 ```
 
-## Android 构建
+如果要编译 Android App，还需要 JDK 21、Android SDK 36 和 Build Tools 36.0.0。Android Studio 不是必需的，但调试原生工程时会方便一些。
 
-同步 Web 资源到 Android 工程：
+## 打包 Android App
+
+把最新的网页资源同步到 Android 工程：
 
 ```bash
 npm run android:sync
 ```
 
-在 Android Studio 中打开：
+用 Android Studio 打开原生工程：
 
 ```bash
 npm run android:open
 ```
 
-生成调试 APK：
+直接生成调试 APK：
 
 ```bash
 npm run android:apk
 ```
 
-APK 输出位置：
+生成的文件在：
 
 ```text
 android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-仓库不包含签名密钥、发布版 APK、本机 SDK 路径或用户数据。正式发布前请自行配置 release signing。
+仓库里不会提交签名密钥、本机 SDK 路径、用户数据或编译出来的 APK。要发布正式版本，需要自己配置 release signing。
 
-可下载的调试 APK 位于 GitHub Releases。历史 APK 仅作为二进制归档保存；除当前版本外，它们不代表本仓库中存在一一对应的源码快照。
+想直接安装的话，可以去 GitHub Releases 下载已经测试过的调试 APK。里面也保留了几个旧版本方便存档，但只有当前版本能和仓库里的源码一一对应。
 
-## 通知可靠性
+## 关于通知
 
-Android 厂商对自启动、后台活动、电池优化和通知样式的设置入口并不统一。App 会识别设备厂商并尽量打开对应页面；厂商自启动开关通常无法由第三方 App 读取，因此这一步仍需用户手动确认。
+不同品牌的 Android 手机会把自启动、后台活动、电池优化和通知设置放在不同位置。App 会识别手机品牌，并尽量打开对应的设置页面。不过，第三方 App 通常读不到厂商的自启动开关，所以这一步仍然需要自己确认。
 
-## 项目结构
+## 目录大概这样
 
 ```text
 src/app/                         页面与交互组件
@@ -86,9 +80,9 @@ src/lib/                         本地数据、通知和 Android 桥接封装
 android/app/src/main/java/       Capacitor 原生插件与 Android 逻辑
 android/app/src/main/res/        Android 图标、启动图和资源
 public/                          Web 静态资源
-.github/workflows/ci.yml         自动化检查与 Android 构建
+.github/workflows/ci.yml         GitHub Actions 检查与 Android 构建
 ```
 
-## 项目关系
+## 关于这个仓库
 
-本仓库由早期 [Kyy008/DDL-Reminder](https://github.com/Kyy008/DDL-Reminder) 项目沿 Android 本地化方向演进而来，作为独立 Android 仓库维护，不共享原仓库的 Git 提交历史。Android 本地存储、原生通知、厂商后台设置适配、壁纸处理及移动端布局均在本仓库中继续开发。
+这个项目一开始是在 [Kyy008/DDL-Reminder](https://github.com/Kyy008/DDL-Reminder) 的基础上做的，后来逐渐改成了纯本地的 Android App。现在这个仓库单独维护，也没有沿用原仓库的 Git 提交历史。Android 本地存储、原生通知、不同品牌手机的后台设置、壁纸和移动端布局等功能，都是在这里继续做的。

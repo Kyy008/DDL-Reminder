@@ -46,7 +46,8 @@
             android:name=".MainActivity"
             android:label="@string/title_activity_main"
             android:theme="@style/AppTheme.NoActionBarLaunch"
-            android:launchMode="singleTask"
+            android:excludeFromRecents="false"
+            android:launchMode="singleInstance"
             android:exported="true">
 
             <intent-filter>
