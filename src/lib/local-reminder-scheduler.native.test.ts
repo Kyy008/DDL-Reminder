@@ -126,7 +126,7 @@ describe("native local reminder scheduling", () => {
     });
   });
 
-  it("keeps the short background test out of the idle-alarm quota", async () => {
+  it("uses an idle-safe alarm for the background notification test", async () => {
     await expect(sendTestNotifications()).resolves.toBeNull();
 
     expect(nativeMocks.schedule).toHaveBeenCalledWith({
@@ -134,7 +134,7 @@ describe("native local reminder scheduling", () => {
         expect.objectContaining({
           id: 2_147_000_002,
           schedule: expect.objectContaining({
-            allowWhileIdle: false
+            allowWhileIdle: true
           })
         })
       ])

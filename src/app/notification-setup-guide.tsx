@@ -379,13 +379,13 @@ export function NotificationSetupGuide() {
         <GuideStep
           actionLabel="发送两条测试通知"
           busy={busyAction === "test"}
-          description="先发一条立即通知，再发一条约 10 秒后的定时通知。点完后请回到桌面并保持亮屏，暂时不要锁屏，也不要从最近任务中关闭 App。"
+          description="先发一条立即通知，再安排一条约 15 秒后的后台通知。点完后可以回到桌面或锁屏等待，请不要连续重复测试。"
           disabled={actionDisabled}
           onAction={() =>
             void runAction(
               "test",
               sendTestNotifications,
-              "已立即发送一条通知，并安排约 10 秒后再发送一条。请回到桌面并保持亮屏，暂时不要锁屏，也不要从最近任务中关闭 App。",
+              "已立即发送一条通知，并安排约 15 秒后再发送一条。现在可以回到桌面或锁屏等待，请不要连续重复测试。",
               classifyReminderResult
             )
           }

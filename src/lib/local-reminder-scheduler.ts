@@ -47,6 +47,7 @@ const REMINDER_CHANNEL_ID = "ddl-reminders-v2";
 const REMINDER_SMALL_ICON = "ic_stat_ddl";
 const TEST_NOTIFICATION_ID = 2_147_000_001;
 const SCHEDULED_TEST_NOTIFICATION_ID = 2_147_000_002;
+const SCHEDULED_TEST_DELAY_MS = 15_000;
 const NOTIFICATION_PERMISSION_ERROR =
   "通知权限还没打开。任务已经保存，但可能收不到提醒。";
 const EXACT_ALARM_PERMISSION_WARNING =
@@ -258,11 +259,8 @@ export async function sendTestNotifications() {
         channelId: REMINDER_CHANNEL_ID,
         smallIcon: REMINDER_SMALL_ICON,
         schedule: {
-          at: new Date(Date.now() + 10_000),
-          // This short diagnostic runs while the user is on the Home screen.
-          // Using the idle-safe API here would consume Android's per-app alarm
-          // quota and make repeated tests look broken even when scheduling works.
-          allowWhileIdle: false
+          at: new Date(Date.now() + SCHEDULED_TEST_DELAY_MS),
+          allowWhileIdle: true
         },
         autoCancel: true
       }
