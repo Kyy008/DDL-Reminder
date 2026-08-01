@@ -12,11 +12,6 @@ const config: CapacitorConfig = {
     loggingBehavior: "none",
     webContentsDebuggingEnabled: false
   },
-  cordova: {
-    preferences: {
-      KeepRunning: "false"
-    }
-  },
   plugins: {
     LocalNotifications: {
       iconColor: "#4bae50"

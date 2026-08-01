@@ -25,6 +25,7 @@ import { LocalSettings, LocalTask } from "@/lib/local-app-state";
 import { syncAllTaskReminders } from "@/lib/local-reminder-scheduler";
 import { localTaskStore } from "@/lib/local-task-store";
 import { TaskStatusValue } from "@/lib/task-constants";
+import { getTaskDeadlineSubmissionError } from "@/lib/task-validation";
 import CalendarView from "./calendar-view";
 import DeadlinePicker, { TimeWheelColumn } from "./deadline-picker";
 import { NotificationSetupGuide } from "./notification-setup-guide";
@@ -174,6 +175,7 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
   const [tasks, setTasks] = useState<TaskDto[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [busyTaskId, setBusyTaskId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isErrorTone, setIsErrorTone] = useState(true);
@@ -466,12 +468,30 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const isCreatingTask = editingTaskId === null;
+    const deadlineError = getTaskDeadlineSubmissionError(form, {
+      isCreatingTask,
+      now: new Date()
+    });
+
+    if (deadlineError) {
+      setIsErrorTone(true);
+      setError((currentError) =>
+        currentError === deadlineError ? currentError : deadlineError
+      );
+      return;
+    }
+
+    if (isSubmittingRef.current) {
+      return;
+    }
+
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     setError(null);
     setIsErrorTone(true);
 
     try {
-      const isCreatingTask = editingTaskId === null;
       const payload = formToPayload(form, isCreatingTask);
       const savedTask = editingTaskId
         ? await localTaskStore.updateTask(editingTaskId, payload)
@@ -502,6 +522,7 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
     } catch (submitError) {
       setError(getErrorMessage(submitError));
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   }

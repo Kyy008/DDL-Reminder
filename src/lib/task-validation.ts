@@ -64,6 +64,47 @@ export const updateTaskSchema = updateTaskFieldsSchema
 export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 
+export function getTaskDeadlineSubmissionError(
+  form: {
+    hasDeadline: boolean;
+    startAt?: string | null;
+    dueAt?: string | null;
+  },
+  {
+    isCreatingTask,
+    now
+  }: {
+    isCreatingTask: boolean;
+    now: Date;
+  }
+) {
+  if (!form.hasDeadline) {
+    return null;
+  }
+
+  const dueAt = form.dueAt ? new Date(form.dueAt) : null;
+
+  if (!dueAt || Number.isNaN(dueAt.getTime())) {
+    return TASK_ERROR_MESSAGES.dateInvalid;
+  }
+
+  if (isCreatingTask) {
+    return dueAt.getTime() > now.getTime()
+      ? null
+      : TASK_ERROR_MESSAGES.deadlineNotFuture;
+  }
+
+  const startAt = form.startAt ? new Date(form.startAt) : null;
+
+  if (!startAt || Number.isNaN(startAt.getTime())) {
+    return TASK_ERROR_MESSAGES.dateInvalid;
+  }
+
+  return isValidTaskDateRange(startAt, dueAt)
+    ? null
+    : TASK_ERROR_MESSAGES.dateRangeInvalid;
+}
+
 export function normalizeOptionalDescription(description: string | undefined) {
   return description && description.length > 0 ? description : null;
 }
