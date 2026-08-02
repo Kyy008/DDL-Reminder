@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   build-and-release:
-    name: Build and publish preview APK
+    name: Build and publish signed Android release
     runs-on: ubuntu-latest
 
     defaults:
@@ -53,16 +53,57 @@ jobs:
       - name: Build and sync Android project
         run: npm run build && npx cap sync android
 
-      - name: Build preview APK
+      - name: Restore release keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/ddl-reminder-release.jks
+          chmod 600 android/app/ddl-reminder-release.jks
+
+      - name: Build signed APK and AAB
         working-directory: apps/android/android
-        run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/apps/android/android/app/ddl-reminder-release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+          ./gradlew --no-daemon testDebugUnitTest lintRelease assembleRelease bundleRelease
+
+      - name: Verify release signatures
+        run: |
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs \
+            android/app/build/outputs/apk/release/app-release.apk
+          jarsigner -verify \
+            android/app/build/outputs/bundle/release/app-release.aab
 
       - name: Prepare release assets
         run: |
           mkdir -p release
-          cp android/app/build/outputs/apk/debug/app-debug.apk "release/DDL-Reminder-Android-${GITHUB_REF_NAME}-debug.apk"
+          if [[ "$GITHUB_REF" == refs/tags/android-v* ]]; then
+            release_version="${GITHUB_REF_NAME#android-}"
+          else
+            release_version="manual-${GITHUB_SHA::7}"
+          fi
+          cp android/app/build/outputs/apk/release/app-release.apk "release/DDL-Reminder-Android-${release_version}.apk"
+          cp android/app/build/outputs/bundle/release/app-release.aab "release/DDL-Reminder-Android-${release_version}.aab"
           cd release
-          sha256sum "DDL-Reminder-Android-${GITHUB_REF_NAME}-debug.apk" > "DDL-Reminder-Android-${GITHUB_REF_NAME}-debug.apk.sha256"
+          sha256sum *.apk *.aab > SHA256SUMS.txt
+
+      - name: Upload signed build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-${{ github.sha }}
+          path: apps/android/release/*
+          if-no-files-found: error
+
+      - name: Remove release keystore
+        if: always()
+        run: rm -f android/app/ddl-reminder-release.jks
 
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/android-v')
@@ -70,9 +111,10 @@ jobs:
         with:
           name: DDL Reminder Android ${{ github.ref_name }}
           body: |
-            Android 本地版预览构建。安装 APK 前请确认设备允许从当前来源安装应用。
+            Android 正式签名版本。直接安装请下载 APK；提交应用商店请使用 AAB。
 
-            当前产物为 Debug Preview；正式签名版本将在配置发布签名后提供。
-          prerelease: true
+            安装 APK 前请确认设备允许从当前来源安装应用，并可使用 `SHA256SUMS.txt` 校验下载文件。
+          prerelease: false
+          make_latest: true
           generate_release_notes: true
           files: apps/android/release/*

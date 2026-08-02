@@ -38,6 +38,12 @@ android/app/build/outputs/apk/debug/app-debug.apk
 开发网页界面时运行 `npm run dev`；修改完成后可用
 `npm run android:sync` 同步到 Android 工程。
 
+## 正式发布
+
+正式版本由 GitHub Actions 使用仓库加密密钥完成签名。向 `main` 上的提交推送
+`android-v*` 标签后，流水线会执行测试与检查，并发布已签名的 APK、AAB 和
+SHA-256 校验文件。签名私钥不得提交到仓库。
+
 ## 通知说明
 
 不同厂商对后台运行的限制不同。如果提醒没有按时出现，请在应用的“自启动与后台”页面检查自启动、电池优化和通知权限。这些开关通常只能手动确认。
