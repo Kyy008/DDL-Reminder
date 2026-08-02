@@ -1,6 +1,6 @@
 node_modules
 .next
-src/generated/prisma
+**/src/generated/prisma
 out
 dist
 coverage
@@ -8,12 +8,12 @@ coverage
 .env*.local
 *.log
 .DS_Store
-prisma/*.db
-prisma/*.db-journal
-data/*.db
-data/*.db-journal
-data/*.db-wal
-data/*.db-shm
-!data/.gitkeep
+**/prisma/*.db
+**/prisma/*.db-journal
+**/data/*.db
+**/data/*.db-journal
+**/data/*.db-wal
+**/data/*.db-shm
+!**/data/.gitkeep
 plan.md
 zh-plan.md

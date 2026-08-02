@@ -1,6 +1,8 @@
-# Deploy DDL Reminder
+# Deploy DDL Reminder Web
 
 This project can be deployed to a Linux server with GitHub Actions over SSH. The server builds and runs the app with Docker Compose.
+
+Web 应用位于 monorepo 的 `apps/web` 目录。GitHub Actions 只打包该目录，因此服务器上的部署结构和迁移前保持一致。
 
 ## 1. Prepare the server
 
@@ -93,7 +95,7 @@ For `SSH_PRIVATE_KEY`, paste the full private key file, including the begin and 
 
 ## 4. Deploy
 
-Push to `main`. After the `CI` workflow succeeds, the `Deploy` workflow will publish the same commit. You can also run the `Deploy` workflow manually from GitHub Actions.
+修改 `apps/web` 并推送到 `main` 后，`Web CI` 会执行检查与构建；全部通过后调用 `Web Deploy` 发布同一提交。你也可以从 GitHub Actions 手动运行 `Web Deploy`。
 
 After the first run, check the server:
 

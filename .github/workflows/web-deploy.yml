@@ -1,37 +1,28 @@
-name: Deploy
+name: Web Deploy
 
 on:
-  workflow_run:
-    workflows:
-      - CI
-    types:
-      - completed
-    branches:
-      - main
+  workflow_call:
   workflow_dispatch:
 
 concurrency:
-  group: production-deploy
+  group: production-web-deploy
   cancel-in-progress: false
 
 jobs:
   deploy:
     name: Deploy to Linux server
     runs-on: ubuntu-latest
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     env:
       SERVER_HOST: ${{ secrets.SERVER_HOST }}
       SERVER_USER: ${{ secrets.SERVER_USER }}
       SERVER_PORT: ${{ secrets.SERVER_PORT || '22' }}
       DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/opt/ddl-reminder' }}
-      RELEASE_NAME: ${{ github.event.workflow_run.head_sha || github.sha }}
+      RELEASE_NAME: ${{ github.sha }}
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Configure SSH
         run: |
@@ -41,11 +32,10 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p "$SERVER_PORT" -H "$SERVER_HOST" >> ~/.ssh/known_hosts
 
-      - name: Upload release
+      - name: Upload Web release
+        working-directory: apps/web
         run: |
           tar \
-            --exclude='.git' \
-            --exclude='.github' \
             --exclude='.next' \
             --exclude='coverage' \
             --exclude='data' \
@@ -57,11 +47,11 @@ jobs:
             --exclude='.env.*' \
             --exclude='*.log' \
             --exclude='.DS_Store' \
-            -czf /tmp/ddl-reminder-release.tgz .
+            -czf /tmp/ddl-reminder-web-release.tgz .
           ssh -i ~/.ssh/deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "mkdir -p '$DEPLOY_PATH/releases/$RELEASE_NAME'"
-          scp -i ~/.ssh/deploy_key -P "$SERVER_PORT" /tmp/ddl-reminder-release.tgz "$SERVER_USER@$SERVER_HOST:$DEPLOY_PATH/releases/$RELEASE_NAME/release.tgz"
+          scp -i ~/.ssh/deploy_key -P "$SERVER_PORT" /tmp/ddl-reminder-web-release.tgz "$SERVER_USER@$SERVER_HOST:$DEPLOY_PATH/releases/$RELEASE_NAME/release.tgz"
 
-      - name: Restart application
+      - name: Restart Web application
         run: |
           ssh -i ~/.ssh/deploy_key -p "$SERVER_PORT" "$SERVER_USER@$SERVER_HOST" "DEPLOY_PATH='$DEPLOY_PATH' RELEASE_NAME='$RELEASE_NAME' bash -s" <<'SCRIPT'
           set -euo pipefail

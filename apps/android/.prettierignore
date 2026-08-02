@@ -1,0 +1,8 @@
+.next/
+out/
+node_modules/
+src/generated/
+device-backups/
+android/.gradle/
+android/**/build/
+android/app/src/main/assets/

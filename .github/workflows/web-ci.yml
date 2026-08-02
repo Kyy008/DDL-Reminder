@@ -1,11 +1,17 @@
-name: CI
+name: Web CI
 
 on:
   push:
-    branches:
-      - main
-      - master
+    paths:
+      - "apps/web/**"
+      - ".github/workflows/web-ci.yml"
+      - ".github/workflows/web-deploy.yml"
   pull_request:
+    paths:
+      - "apps/web/**"
+      - ".github/workflows/web-ci.yml"
+      - ".github/workflows/web-deploy.yml"
+  workflow_dispatch:
 
 jobs:
   test-and-build:
@@ -38,6 +44,10 @@ jobs:
       MAIL_FROM: DDL Reminder <reminder@example.com>
       TZ: Asia/Shanghai
 
+    defaults:
+      run:
+        working-directory: apps/web
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -47,6 +57,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: apps/web/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -65,3 +76,10 @@ jobs:
 
       - name: Run production build
         run: npm run build
+
+  deploy:
+    name: Deploy Web
+    needs: test-and-build
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/web-deploy.yml
+    secrets: inherit

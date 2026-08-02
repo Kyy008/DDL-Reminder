@@ -1,0 +1,75 @@
+name: Android CI
+
+on:
+  push:
+    paths:
+      - "apps/android/**"
+      - ".github/workflows/android-ci.yml"
+      - ".github/workflows/android-release.yml"
+  pull_request:
+    paths:
+      - "apps/android/**"
+      - ".github/workflows/android-ci.yml"
+      - ".github/workflows/android-release.yml"
+  workflow_dispatch:
+
+jobs:
+  test-and-build:
+    name: Lint, Test, Build APK
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: apps/android
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/android/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install Android SDK 36
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build Web assets
+        run: npm run build
+
+      - name: Sync Android project
+        run: npx cap sync android
+
+      - name: Test, lint and build Android app
+        working-directory: apps/android/android
+        run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ddl-reminder-android-debug
+          path: apps/android/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
