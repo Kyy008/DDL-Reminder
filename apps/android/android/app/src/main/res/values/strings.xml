@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">DDL-Reminder</string>
+    <string name="title_activity_main">DDL-Reminder</string>
+    <string name="package_name">com.kyy.ddlreminder</string>
+    <string name="custom_url_scheme">com.kyy.ddlreminder</string>
+</resources>

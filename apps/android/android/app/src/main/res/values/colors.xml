@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#4BAE50</color>
+    <color name="colorPrimaryDark">#F7FAF4</color>
+    <color name="colorAccent">#18D86B</color>
+    <color name="ddlStatusBarLight">#F7FAF4</color>
+    <color name="ddlStatusBarDark">#0C0D0B</color>
+</resources>

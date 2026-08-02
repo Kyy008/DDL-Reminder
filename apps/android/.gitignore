@@ -1,0 +1,36 @@
+node_modules
+.next
+src/generated/prisma
+out
+dist
+coverage
+device-backups/
+.env*
+!.env.example
+*.log
+*.tsbuildinfo
+.DS_Store
+prisma/*.db
+prisma/*.db-journal
+data/*.db
+data/*.db-journal
+data/*.db-wal
+data/*.db-shm
+!data/.gitkeep
+plan.md
+zh-plan.md
+
+# Local delivery artifacts
+DDL-Reminder-mobile-handoff-*.zip
+handoff/
+MOBILE_HANDOFF.md
+
+# Editor settings
+.idea/
+.vscode/
+
+# Signing and service credentials
+*.jks
+*.keystore
+key.properties
+google-services.json
