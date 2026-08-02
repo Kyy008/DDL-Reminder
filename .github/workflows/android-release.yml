@@ -82,6 +82,7 @@ jobs:
             android/app/build/outputs/bundle/release/app-release.aab
 
       - name: Prepare release assets
+        id: release-assets
         run: |
           mkdir -p release
           if [[ "$GITHUB_REF" == refs/tags/android-v* ]]; then
@@ -89,6 +90,7 @@ jobs:
           else
             release_version="manual-${GITHUB_SHA::7}"
           fi
+          echo "version=$release_version" >> "$GITHUB_OUTPUT"
           cp android/app/build/outputs/apk/release/app-release.apk "release/DDL-Reminder-Android-${release_version}.apk"
           cp android/app/build/outputs/bundle/release/app-release.aab "release/DDL-Reminder-Android-${release_version}.aab"
           cd release
@@ -109,7 +111,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/android-v')
         uses: softprops/action-gh-release@v2
         with:
-          name: DDL Reminder Android ${{ github.ref_name }}
+          name: DDL Reminder Android ${{ steps.release-assets.outputs.version }}
           body: |
             Android 正式签名版本。直接安装请下载 APK；提交应用商店请使用 AAB。
 
