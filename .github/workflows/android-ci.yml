@@ -1,16 +1,29 @@
-name: CI
+name: Android CI
 
 on:
   push:
     branches:
       - main
       - master
+    paths:
+      - "apps/android/**"
+      - ".github/workflows/android-ci.yml"
+      - ".github/workflows/android-release.yml"
   pull_request:
+    paths:
+      - "apps/android/**"
+      - ".github/workflows/android-ci.yml"
+      - ".github/workflows/android-release.yml"
+  workflow_dispatch:
 
 jobs:
   test-and-build:
-    name: Lint, Test, Build
+    name: Lint, Test, Build APK
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: apps/android
 
     steps:
       - name: Checkout repository
@@ -21,6 +34,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          cache-dependency-path: apps/android/package-lock.json
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -46,12 +60,19 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Run production build
+      - name: Build Web assets
         run: npm run build
 
       - name: Sync Android project
         run: npx cap sync android
 
-      - name: Check and build Android app
-        working-directory: android
-        run: ./gradlew testDebugUnitTest lintDebug assembleDebug
+      - name: Test, lint and build Android app
+        working-directory: apps/android/android
+        run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: ddl-reminder-android-debug
+          path: apps/android/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error

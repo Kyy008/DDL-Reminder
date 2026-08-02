@@ -1,8 +1,8 @@
-# DDL-Reminder-Android
+# DDL Reminder Android
 
 Android DDL 任务提醒工具。无需登录，所有数据都保存在手机上。
 
-APK 可以在 [Releases](https://github.com/Mark8924/DDL-Reminder-Android/releases) 下载。
+APK 可以在主仓库的 [Releases](https://github.com/Kyy008/DDL-Reminder/releases) 下载。
 
 ## 功能
 
@@ -17,6 +17,12 @@ APK 可以在 [Releases](https://github.com/Mark8924/DDL-Reminder-Android/releas
 ## 从源码构建
 
 需要 Node.js 22、JDK 21、Android SDK 36 和 Build Tools 36.0.0。
+
+先进入 Android 应用目录：
+
+```bash
+cd apps/android
+```
 
 ```bash
 npm ci
@@ -36,6 +42,6 @@ android/app/build/outputs/apk/debug/app-debug.apk
 
 不同厂商对后台运行的限制不同。如果提醒没有按时出现，请在应用的“自启动与后台”页面检查自启动、电池优化和通知权限。这些开关通常只能手动确认。
 
-## 来源
+## 项目关系
 
-这个 Android 版本最初基于 [Kyy008/DDL-Reminder](https://github.com/Kyy008/DDL-Reminder) 改造，目前在这个仓库单独维护。
+这个 Android 版本由 [@Mark8924](https://github.com/Mark8924) 基于 DDL Reminder Web 版改造，现与 Web 端共同维护在 [Kyy008/DDL-Reminder](https://github.com/Kyy008/DDL-Reminder) 仓库中。Android 代码位于 `apps/android`，并保留原仓库提交历史。

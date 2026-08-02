@@ -1,0 +1,78 @@
+name: Android Release
+
+on:
+  push:
+    tags:
+      - "android-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build and publish preview APK
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: apps/android
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/android/package-lock.json
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Install Android SDK 36
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run quality checks
+        run: npm run lint && npm test
+
+      - name: Build and sync Android project
+        run: npm run build && npx cap sync android
+
+      - name: Build preview APK
+        working-directory: apps/android/android
+        run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          cp android/app/build/outputs/apk/debug/app-debug.apk "release/DDL-Reminder-Android-${GITHUB_REF_NAME}-debug.apk"
+          cd release
+          sha256sum "DDL-Reminder-Android-${GITHUB_REF_NAME}-debug.apk" > "DDL-Reminder-Android-${GITHUB_REF_NAME}-debug.apk.sha256"
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/android-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: DDL Reminder Android ${{ github.ref_name }}
+          body: |
+            Android 本地版预览构建。安装 APK 前请确认设备允许从当前来源安装应用。
+
+            当前产物为 Debug Preview；正式签名版本将在配置发布签名后提供。
+          prerelease: true
+          generate_release_notes: true
+          files: apps/android/release/*
