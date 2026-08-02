@@ -61,7 +61,7 @@ jobs:
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > android/app/ddl-reminder-release.jks
           chmod 600 android/app/ddl-reminder-release.jks
 
-      - name: Build signed APK and AAB
+      - name: Build signed APK
         working-directory: apps/android/android
         env:
           ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/apps/android/android/app/ddl-reminder-release.jks
@@ -72,14 +72,12 @@ jobs:
           test -n "$ANDROID_KEYSTORE_PASSWORD"
           test -n "$ANDROID_KEY_ALIAS"
           test -n "$ANDROID_KEY_PASSWORD"
-          ./gradlew --no-daemon testDebugUnitTest lintRelease assembleRelease bundleRelease
+          ./gradlew --no-daemon testDebugUnitTest lintRelease assembleRelease
 
       - name: Verify release signatures
-        run: |
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs \
-            android/app/build/outputs/apk/release/app-release.apk
-          jarsigner -verify \
-            android/app/build/outputs/bundle/release/app-release.aab
+        run: >-
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs
+          android/app/build/outputs/apk/release/app-release.apk
 
       - name: Prepare release assets
         id: release-assets
@@ -92,9 +90,6 @@ jobs:
           fi
           echo "version=$release_version" >> "$GITHUB_OUTPUT"
           cp android/app/build/outputs/apk/release/app-release.apk "release/DDL-Reminder-Android-${release_version}.apk"
-          cp android/app/build/outputs/bundle/release/app-release.aab "release/DDL-Reminder-Android-${release_version}.aab"
-          cd release
-          sha256sum *.apk *.aab > SHA256SUMS.txt
 
       - name: Upload signed build artifacts
         uses: actions/upload-artifact@v4
@@ -112,10 +107,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           name: DDL Reminder Android ${{ steps.release-assets.outputs.version }}
-          body: |
-            Android 正式签名版本。直接安装请下载 APK；提交应用商店请使用 AAB。
-
-            安装 APK 前请确认设备允许从当前来源安装应用，并可使用 `SHA256SUMS.txt` 校验下载文件。
+          body: Android 正式版。请下载下方的 APK 文件安装。
           prerelease: false
           make_latest: true
           generate_release_notes: true

@@ -35,7 +35,7 @@ npm run android:apk
 
 - `Web CI`：检查、测试并构建 Web 应用；`main` 上成功后部署服务器。
 - `Android CI`：检查、测试并生成 Android Debug APK 构建产物。
-- `Android Release`：推送 `android-v*` 标签时创建带 APK 和 SHA-256 文件的预发布版本。
+- `Android Release`：推送 `android-v*` 标签时创建带签名 APK 的正式版本。
 
 ## 分支约定
 

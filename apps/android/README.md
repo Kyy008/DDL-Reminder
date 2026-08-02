@@ -41,8 +41,8 @@ android/app/build/outputs/apk/debug/app-debug.apk
 ## 正式发布
 
 正式版本由 GitHub Actions 使用仓库加密密钥完成签名。向 `main` 上的提交推送
-`android-v*` 标签后，流水线会执行测试与检查，并发布已签名的 APK、AAB 和
-SHA-256 校验文件。签名私钥不得提交到仓库。
+`android-v*` 标签后，流水线会执行测试与检查，并发布已签名的 APK。
+签名私钥不得提交到仓库。
 
 ## 通知说明
 
