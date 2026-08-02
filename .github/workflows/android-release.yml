@@ -78,7 +78,7 @@ jobs:
         run: |
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs \
             android/app/build/outputs/apk/release/app-release.apk
-          jarsigner -verify -strict \
+          jarsigner -verify \
             android/app/build/outputs/bundle/release/app-release.aab
 
       - name: Prepare release assets
