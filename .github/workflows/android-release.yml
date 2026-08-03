@@ -81,8 +81,19 @@ jobs:
           signature_report="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk)"
           printf '%s\n' "$signature_report"
 
-          actual_signer_sha256="$(printf '%s\n' "$signature_report" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
-          test -n "$actual_signer_sha256"
+          signer_sha256_digests="$(
+            printf '%s\n' "$signature_report" |
+              sed -nE 's/^Signer #[0-9]+ certificate SHA-256 digest: ([0-9A-Fa-f]{64})$/\1/p' |
+              tr '[:upper:]' '[:lower:]'
+          )"
+          signer_count="$(printf '%s\n' "$signer_sha256_digests" | sed '/^$/d' | wc -l | tr -d '[:space:]')"
+
+          if [[ "$signer_count" -ne 1 ]]; then
+            echo "::error::Expected exactly one Android signer, found $signer_count"
+            exit 1
+          fi
+
+          actual_signer_sha256="$signer_sha256_digests"
 
           if [[ "$actual_signer_sha256" != "$EXPECTED_SIGNER_SHA256" ]]; then
             echo "::error::Unexpected Android signing certificate: $actual_signer_sha256"
