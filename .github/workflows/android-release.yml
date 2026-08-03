@@ -74,10 +74,20 @@ jobs:
           test -n "$ANDROID_KEY_PASSWORD"
           ./gradlew --no-daemon testDebugUnitTest lintRelease assembleRelease
 
-      - name: Verify release signatures
-        run: >-
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs
-          android/app/build/outputs/apk/release/app-release.apk
+      - name: Verify release signature identity
+        env:
+          EXPECTED_SIGNER_SHA256: 1bfd5a348cd417bf650e0487a25f11228946c698a2bb065da1136d0b707a9c18
+        run: |
+          signature_report="$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs android/app/build/outputs/apk/release/app-release.apk)"
+          printf '%s\n' "$signature_report"
+
+          actual_signer_sha256="$(printf '%s\n' "$signature_report" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
+          test -n "$actual_signer_sha256"
+
+          if [[ "$actual_signer_sha256" != "$EXPECTED_SIGNER_SHA256" ]]; then
+            echo "::error::Unexpected Android signing certificate: $actual_signer_sha256"
+            exit 1
+          fi
 
       - name: Prepare release assets
         id: release-assets
