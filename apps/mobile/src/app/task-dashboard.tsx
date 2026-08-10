@@ -1113,12 +1113,7 @@ function TaskSidebar({
           title={isCollapsed ? "展开侧边导航栏" : "收起侧边导航栏"}
           type="button"
         >
-          <SidebarIcon
-            className={`transition-transform duration-300 ${
-              isCollapsed ? "rotate-180" : ""
-            }`}
-            name="collapse"
-          />
+          <SidebarIcon name="menu" />
         </button>
       </div>
 
@@ -1465,7 +1460,7 @@ function SettingsPanel({
               type="button"
             >
               <span
-                className={`absolute left-1 top-1 size-5 rounded-full bg-[var(--background)] transition-transform ${
+                className={`absolute left-1 top-[3px] size-5 rounded-full bg-[var(--background)] transition-transform ${
                   settings.emailReminderEnabled
                     ? "translate-x-5"
                     : "translate-x-0"
@@ -1513,24 +1508,15 @@ function SettingsPanel({
         <section className="glass-panel rounded-xl border border-[var(--border)] px-5 shadow-2xl shadow-black/20 sm:px-7">
           <div className="flex items-center justify-between gap-5 py-5">
             <div className="min-w-0">
-              <h2 className="text-sm font-semibold">
-                {backgroundPrivacyKind === "android-recents"
-                  ? "隐藏后台卡片"
-                  : "隐藏后台预览"}
-              </h2>
+              <h2 className="text-sm font-semibold">隐藏后台卡片</h2>
               <p className="mt-1 text-sm leading-6 text-[var(--muted-foreground)]">
-                {backgroundPrivacyKind === "android-recents"
-                  ? "开启后，DDL-Reminder 不会出现在系统最近任务中。桌面图标照常能打开，任务提醒也不受影响。"
-                  : "开启后，离开 DDL-Reminder 时会遮住 App 切换器里的任务内容。App 仍会保留在后台列表中，任务提醒也不受影响。"}
+                开启后，DDL-Reminder
+                不会出现在系统最近任务中。桌面图标照常能打开，任务提醒也不受影响。
               </p>
             </div>
             <button
               aria-checked={backgroundPrivacyEnabled}
-              aria-label={
-                backgroundPrivacyKind === "android-recents"
-                  ? "隐藏系统最近任务中的应用卡片"
-                  : "隐藏 App 切换器中的任务内容"
-              }
+              aria-label="隐藏系统最近任务中的应用卡片"
               className={`relative h-7 w-12 shrink-0 rounded-full border transition ${
                 backgroundPrivacyEnabled
                   ? "border-[var(--primary)] bg-[var(--primary)]"
@@ -1542,7 +1528,7 @@ function SettingsPanel({
               type="button"
             >
               <span
-                className={`absolute left-1 top-1 size-5 rounded-full bg-[var(--background)] transition-transform ${
+                className={`absolute left-1 top-[3px] size-5 rounded-full bg-[var(--background)] transition-transform ${
                   backgroundPrivacyEnabled ? "translate-x-5" : "translate-x-0"
                 }`}
               />

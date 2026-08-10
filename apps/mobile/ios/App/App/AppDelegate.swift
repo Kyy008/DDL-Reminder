@@ -5,10 +5,6 @@ import Capacitor
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
-    private var backgroundPrivacyShield: UIVisualEffectView?
-
-    private static let backgroundPrivacyPreferenceKey =
-        "CapacitorStorage.ddl-reminder:hide-background-preview"
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
@@ -16,13 +12,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
-        protectBackgroundPreviewIfNeeded()
+        // Sent when the application is about to move from active to inactive state.
     }
 
     func applicationDidEnterBackground(_ application: UIApplication) {
-        // This is a fallback for cold/background launches that do not pass through
-        // the usual active-to-inactive transition before iOS takes its snapshot.
-        protectBackgroundPreviewIfNeeded()
+        // Use this method to release shared resources and save application state.
     }
 
     func applicationWillEnterForeground(_ application: UIApplication) {
@@ -30,7 +24,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
-        removeBackgroundPrivacyShield()
+        // Restart work that was paused while the application was inactive.
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
@@ -48,31 +42,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Feel free to add additional processing here, but if you want the App API to support
         // tracking app url opens, make sure to keep this call
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
-    }
-
-    private func protectBackgroundPreviewIfNeeded() {
-        guard backgroundPrivacyEnabled,
-              backgroundPrivacyShield == nil,
-              let window else {
-            return
-        }
-
-        let shield = UIVisualEffectView(effect: UIBlurEffect(style: .dark))
-        shield.frame = window.bounds
-        shield.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        shield.isUserInteractionEnabled = false
-        window.addSubview(shield)
-        window.bringSubviewToFront(shield)
-        backgroundPrivacyShield = shield
-    }
-
-    private func removeBackgroundPrivacyShield() {
-        backgroundPrivacyShield?.removeFromSuperview()
-        backgroundPrivacyShield = nil
-    }
-
-    private var backgroundPrivacyEnabled: Bool {
-        UserDefaults.standard.string(forKey: Self.backgroundPrivacyPreferenceKey) == "true"
     }
 
 }

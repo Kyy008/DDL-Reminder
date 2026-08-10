@@ -1,9 +1,9 @@
 "use client";
 
+import { Capacitor } from "@capacitor/core";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useSyncExternalStore } from "react";
-import { initializeBackgroundPrivacy } from "@/lib/background-privacy";
 import { applyNativeSystemBars } from "@/lib/system-bars";
 import brandIcon from "../../assets/icon/tubiao.png";
 
@@ -12,6 +12,15 @@ type ThemeMode = "system" | "light" | "dark";
 const THEME_STORAGE_KEY = "ddl-reminder:theme-mode";
 const THEME_CHANGE_EVENT = "ddl-reminder:theme-change";
 let fallbackThemeMode: ThemeMode = "dark";
+
+function subscribeNativePlatform() {
+  return () => {};
+}
+
+function getIOSNativeSnapshot() {
+  return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "ios";
+}
+
 const THEME_MODES: Array<{
   icon: "dark" | "light" | "system";
   label: string;
@@ -35,6 +44,11 @@ const THEME_MODES: Array<{
 ];
 
 export function TopNav() {
+  const isIOSNative = useSyncExternalStore(
+    subscribeNativePlatform,
+    getIOSNativeSnapshot,
+    () => false
+  );
   const themeMode = useSyncExternalStore<ThemeMode>(
     subscribeThemeMode,
     getThemeModeSnapshot,
@@ -44,12 +58,6 @@ export function TopNav() {
   useEffect(() => {
     applyThemeMode(themeMode);
   }, [themeMode]);
-
-  useEffect(() => {
-    void initializeBackgroundPrivacy().catch(() => {
-      // Privacy restoration should never prevent the app UI from loading.
-    });
-  }, []);
 
   useEffect(() => {
     if (themeMode !== "system") {
@@ -76,7 +84,7 @@ export function TopNav() {
           <Image
             alt=""
             aria-hidden="true"
-            className="size-8 shrink-0"
+            className={`size-8 shrink-0 ${isIOSNative ? "-translate-y-px" : ""}`}
             priority
             src={brandIcon}
           />
