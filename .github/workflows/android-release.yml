@@ -16,7 +16,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: apps/android
+        working-directory: apps/mobile
 
     steps:
       - name: Checkout repository
@@ -27,7 +27,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: apps/android/package-lock.json
+          cache-dependency-path: apps/mobile/package-lock.json
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -62,9 +62,9 @@ jobs:
           chmod 600 android/app/ddl-reminder-release.jks
 
       - name: Build signed APK
-        working-directory: apps/android/android
+        working-directory: apps/mobile/android
         env:
-          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/apps/android/android/app/ddl-reminder-release.jks
+          ANDROID_KEYSTORE_PATH: ${{ github.workspace }}/apps/mobile/android/app/ddl-reminder-release.jks
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
@@ -116,7 +116,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: android-release-${{ github.sha }}
-          path: apps/android/release/*
+          path: apps/mobile/release/*
           if-no-files-found: error
 
       - name: Remove release keystore
@@ -132,4 +132,4 @@ jobs:
           prerelease: false
           make_latest: true
           generate_release_notes: true
-          files: apps/android/release/*
+          files: apps/mobile/release/*

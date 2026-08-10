@@ -1,0 +1,66 @@
+name: iOS CI
+
+on:
+  push:
+    paths:
+      - "apps/mobile/**"
+      - ".github/workflows/ios-ci.yml"
+  pull_request:
+    paths:
+      - "apps/mobile/**"
+      - ".github/workflows/ios-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  test-and-build:
+    name: Lint, Test, Build iOS App
+    runs-on: macos-latest
+
+    defaults:
+      run:
+        working-directory: apps/mobile
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build Web assets
+        run: npm run build
+
+      - name: Check Web assets for iOS 15.4 compatibility
+        run: npm run check:web-compat -- out
+
+      - name: Sync iOS project
+        run: npx cap sync ios
+
+      - name: Check synced iOS Web assets
+        run: |
+          npm run check:web-compat -- ios/App/App/public
+          npm run check:native-sync -- out ios/App/App/public
+
+      - name: Build iOS app for Simulator
+        run: >-
+          xcodebuild
+          -project ios/App/App.xcodeproj
+          -scheme App
+          -configuration Debug
+          -sdk iphonesimulator
+          -destination "generic/platform=iOS Simulator"
+          CODE_SIGNING_ALLOWED=NO
+          build

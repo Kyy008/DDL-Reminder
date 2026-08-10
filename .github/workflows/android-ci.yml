@@ -3,12 +3,12 @@ name: Android CI
 on:
   push:
     paths:
-      - "apps/android/**"
+      - "apps/mobile/**"
       - ".github/workflows/android-ci.yml"
       - ".github/workflows/android-release.yml"
   pull_request:
     paths:
-      - "apps/android/**"
+      - "apps/mobile/**"
       - ".github/workflows/android-ci.yml"
       - ".github/workflows/android-release.yml"
   workflow_dispatch:
@@ -20,7 +20,7 @@ jobs:
 
     defaults:
       run:
-        working-directory: apps/android
+        working-directory: apps/mobile
 
     steps:
       - name: Checkout repository
@@ -31,7 +31,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: apps/android/package-lock.json
+          cache-dependency-path: apps/mobile/package-lock.json
 
       - name: Setup Java
         uses: actions/setup-java@v4
@@ -60,16 +60,22 @@ jobs:
       - name: Build Web assets
         run: npm run build
 
+      - name: Check Web asset compatibility
+        run: npm run check:web-compat -- out
+
       - name: Sync Android project
         run: npx cap sync android
 
+      - name: Check synced Android Web assets
+        run: npm run check:native-sync -- out android/app/src/main/assets/public
+
       - name: Test, lint and build Android app
-        working-directory: apps/android/android
+        working-directory: apps/mobile/android
         run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: ddl-reminder-android-debug
-          path: apps/android/android/app/build/outputs/apk/debug/app-debug.apk
+          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error

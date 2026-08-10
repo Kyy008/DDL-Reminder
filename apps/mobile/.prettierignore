@@ -1,0 +1,11 @@
+.next/
+out/
+node_modules/
+src/generated/
+device-backups/
+android/.gradle/
+android/**/build/
+android/app/src/main/assets/
+ios/App/App/public/
+ios/App/App/capacitor.config.json
+ios/App/App/Assets.xcassets/**/Contents.json
