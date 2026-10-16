@@ -548,7 +548,7 @@ export function TaskAssistant({ active }: { active: boolean }) {
                           有什么要记下来？
                         </p>
                         <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
-                          可以查任务、安排截止时间，也可以随便聊聊。增删改之前，我会把信息列给你确认。
+                          可以查任务、安排截止时间或标记完成，也可以随便聊聊。改动任务前，我会把信息列给你确认。
                         </p>
                       </div>
                       <div className="flex flex-col gap-2">
@@ -701,19 +701,32 @@ function TaskProposalCard({
   return (
     <article
       className="rounded-xl border border-[var(--border)] bg-[var(--glass-panel-strong)] p-4"
-      aria-label={`${label}任务确认`}
+      aria-label={
+        proposal.operation === "complete" ? "标记完成确认" : `${label}任务确认`
+      }
     >
-      <h3 className="text-sm font-semibold">是否{label}这个任务？</h3>
+      <h3 className="text-sm font-semibold">
+        {proposal.operation === "complete"
+          ? "是否将这个任务标记为完成？"
+          : `是否${label}这个任务？`}
+      </h3>
       <div
         className={`mt-3 grid gap-3 ${proposal.operation === "update" ? "sm:grid-cols-2" : ""}`}
       >
         {proposal.before ? (
           <TaskPreview
-            label={proposal.operation === "update" ? "修改前" : "将要删除"}
+            label={
+              proposal.operation === "complete"
+                ? "将要完成"
+                : proposal.operation === "update"
+                  ? "修改前"
+                  : "将要删除"
+            }
             task={proposal.before}
+            completing={proposal.operation === "complete"}
           />
         ) : null}
-        {proposal.after ? (
+        {proposal.after && proposal.operation !== "complete" ? (
           <TaskPreview
             label={proposal.operation === "update" ? "修改后" : "将要添加"}
             task={proposal.after}
@@ -723,6 +736,11 @@ function TaskProposalCard({
       {proposal.operation === "delete" ? (
         <p className="mt-3 text-xs text-[var(--danger)]">
           删除后无法直接撤销，请核对任务。
+        </p>
+      ) : null}
+      {proposal.operation === "complete" ? (
+        <p className="mt-3 text-xs leading-5 text-[var(--muted-foreground)]">
+          确认后会移到已完成，并取消这项任务的后续提醒。
         </p>
       ) : null}
       {!entry.outcome && active ? (
@@ -741,7 +759,11 @@ function TaskProposalCard({
             onClick={onConfirm}
             className="h-10 rounded-md bg-[var(--success)] text-sm font-semibold text-white transition hover:bg-[var(--success-hover)] disabled:opacity-50"
           >
-            {busy ? "正在保存…" : `确认${label}`}
+            {busy
+              ? "正在保存…"
+              : proposal.operation === "complete"
+                ? "确认完成"
+                : `确认${label}`}
           </button>
         </div>
       ) : (
@@ -754,7 +776,15 @@ function TaskProposalCard({
     </article>
   );
 }
-function TaskPreview({ label, task }: { label: string; task: LocalTask }) {
+function TaskPreview({
+  label,
+  task,
+  completing = false
+}: {
+  label: string;
+  task: LocalTask;
+  completing?: boolean;
+}) {
   return (
     <div className="min-w-0 rounded-lg border border-[var(--border)] bg-[var(--field)] p-3 text-xs leading-6">
       <p className="mb-1 text-[var(--muted-foreground)]">{label}</p>
@@ -784,11 +814,13 @@ function TaskPreview({ label, task }: { label: string; task: LocalTask }) {
         <div>
           <dt className="inline text-[var(--muted-foreground)]">状态：</dt>
           <dd className="inline">
-            {task.status === "ACTIVE"
-              ? "进行中"
-              : task.status === "COMPLETED"
-                ? "已完成"
-                : "已归档"}
+            {completing
+              ? "进行中 → 已完成"
+              : task.status === "ACTIVE"
+                ? "进行中"
+                : task.status === "COMPLETED"
+                  ? "已完成"
+                  : "已归档"}
           </dd>
         </div>
       </dl>
@@ -796,11 +828,13 @@ function TaskPreview({ label, task }: { label: string; task: LocalTask }) {
   );
 }
 function operationLabel(operation: TaskProposal["operation"]) {
-  return operation === "create"
-    ? "添加"
-    : operation === "update"
-      ? "修改"
-      : "删除";
+  return operation === "complete"
+    ? "标记完成"
+    : operation === "create"
+      ? "添加"
+      : operation === "update"
+        ? "修改"
+        : "删除";
 }
 function ChatIcon() {
   return (

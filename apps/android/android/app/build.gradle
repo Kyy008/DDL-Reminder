@@ -30,8 +30,8 @@ android {
         applicationId "com.kyy.ddlreminder"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 16
-        versionName "1.4.1"
+        versionCode 17
+        versionName "1.4.2"
         buildConfigField "String", "DEEPSEEK_PRESET_KEY", '"' + presetAssistantKey + '"'
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {

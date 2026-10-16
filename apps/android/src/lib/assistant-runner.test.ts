@@ -6,6 +6,10 @@ import {
   type AssistantRunnerDependencies
 } from "./assistant-runner";
 import type { AssistantMessage } from "./task-assistant";
+import {
+  createLocalTaskStore,
+  createMemoryStorageBackend
+} from "./local-task-store";
 
 function tool(name: string, args: unknown, id = "tool-1"): AssistantMessage {
   return {
@@ -40,6 +44,55 @@ function setup(replies: AssistantMessage[]) {
   return dependencies;
 }
 describe("assistant tool loop", () => {
+  it("waits for confirmation before completing and leaves a cancelled task active", async () => {
+    const d = setup([
+      tool("propose_task_change", { operation: "complete", taskId: "task-1" }),
+      { role: "assistant", content: "已取消，任务仍未完成。" }
+    ]);
+    const result = await runAssistantTurn(
+      [],
+      "这个任务做完了",
+      d,
+      new AbortController().signal
+    );
+    expect(d.review).toHaveBeenCalledOnce();
+    expect(vi.mocked(d.review).mock.calls[0][0]).toMatchObject({
+      operation: "complete",
+      before: { status: "ACTIVE" },
+      after: { status: "COMPLETED" }
+    });
+    expect(JSON.parse(result.messages[2].content!).status).toBe("cancelled");
+    expect((await d.getState()).tasks[0].status).toBe("ACTIVE");
+  });
+  it("reports completion only after the review applies it through the task store", async () => {
+    const d = setup([
+      tool("propose_task_change", { operation: "complete", taskId: "task-1" }),
+      { role: "assistant", content: "已标记完成。" }
+    ]);
+    const store = createLocalTaskStore(
+      createMemoryStorageBackend(await d.getState())
+    );
+    d.getState = () => store.getState();
+    d.review = vi.fn<AssistantRunnerDependencies["review"]>(
+      async (proposal) => {
+        expect((await store.listTasks())[0].status).toBe("ACTIVE");
+        const task = await store.confirmTaskProposal(proposal);
+        return { status: "confirmed", task, message: "已标记完成。" };
+      }
+    );
+    const result = await runAssistantTurn(
+      [],
+      "完成这个任务",
+      d,
+      new AbortController().signal
+    );
+    expect(result.error).toBeNull();
+    expect(JSON.parse(result.messages[2].content!)).toMatchObject({
+      status: "confirmed",
+      task: { status: "COMPLETED" }
+    });
+    expect((await store.listTasks())[0].status).toBe("COMPLETED");
+  });
   it("does not ask for approval during normal chat", async () => {
     const d = setup([{ role: "assistant", content: "你好" }]);
     const result = await runAssistantTurn(

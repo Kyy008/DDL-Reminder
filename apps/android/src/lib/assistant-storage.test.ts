@@ -14,7 +14,7 @@ import {
   type AssistantConversation
 } from "./assistant-storage";
 import { createTaskProposal } from "./task-assistant";
-import { createEmptyLocalAppState } from "./local-app-state";
+import { createEmptyLocalAppState, createTaskInState } from "./local-app-state";
 
 const values = vi.hoisted(() => new Map<string, string>());
 vi.mock("@capacitor/preferences", () => ({
@@ -35,6 +35,29 @@ beforeEach(() => {
   vi.stubGlobal("window", { dispatchEvent: vi.fn() });
 });
 describe("assistant preferences and history", () => {
+  it("preserves completion cards in history and restores unconfirmed ones as cancelled", async () => {
+    const state = createTaskInState(
+      createEmptyLocalAppState(),
+      { title: "待完成", hasDeadline: false },
+      { id: "complete-1" }
+    ).state;
+    const proposal = createTaskProposal(state, {
+      operation: "complete",
+      taskId: "complete-1"
+    });
+    const saved = await saveAssistantConversation({
+      version: 1,
+      messages: [],
+      entries: [{ id: "complete-card", role: "assistant", text: "", proposal }]
+    });
+    const restored = await loadAssistantConversation(saved.id);
+    expect(restored.entries[0].proposal).toMatchObject({
+      operation: "complete",
+      before: { status: "ACTIVE" },
+      after: { status: "COMPLETED" }
+    });
+    expect(restored.entries[0].outcome).toBe("cancelled");
+  });
   it("is disabled by default and only enables after explicit opt-in", async () => {
     expect(await getAssistantEnabled()).toBe(false);
     await saveAssistantEnabled(true);

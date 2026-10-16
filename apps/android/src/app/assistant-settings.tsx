@@ -111,7 +111,7 @@ export function AssistantSettings() {
       </p>
       <p className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]">
         使用 {ASSISTANT_MODEL_LABEL}{" "}
-        聊天或查询任务。新增、修改、删除会先展示确认卡片；修改会列出前后内容，点绿色确认才执行，红色取消不会改动任务。
+        聊天或查询任务。新增、修改、删除和标记完成都会先展示确认卡片；修改会列出前后内容，点绿色确认才执行，红色取消不会改动任务。
       </p>
       <fieldset className="mt-5" disabled={busy}>
         <legend className="mb-2 text-sm font-semibold">思考强度</legend>

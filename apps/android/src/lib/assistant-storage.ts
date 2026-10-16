@@ -28,7 +28,7 @@ const storedTaskSchema = z.object({
 });
 const storedProposalSchema = z.object({
   id: z.string(),
-  operation: z.enum(["create", "update", "delete"]),
+  operation: z.enum(["create", "update", "delete", "complete"]),
   before: storedTaskSchema.nullable(),
   after: storedTaskSchema.nullable(),
   input: z.record(z.string(), z.unknown())
