@@ -74,6 +74,8 @@ export async function runAssistantTurn(
       if (!reply.tool_calls?.length) return { messages, error: null };
       if (reply.tool_calls.length > 8)
         throw new Error("这次操作过多，请分几次处理。");
+      // Never parallelize task reviews: each card must finish before creating the
+      // next proposal from fresh state. Cancelling one card does not cancel the batch.
       for (const call of reply.tool_calls) {
         signal.throwIfAborted();
         let result: unknown;
