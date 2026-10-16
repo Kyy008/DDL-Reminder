@@ -1,4 +1,5 @@
 import { Preferences } from "@capacitor/preferences";
+import { applyTaskProposalInState, type TaskProposal } from "./task-assistant";
 import {
   archiveTaskInState,
   completeTaskInState,
@@ -28,6 +29,7 @@ export function createLocalTaskStore(
   backend: LocalStorageBackend = createPreferencesStorageBackend()
 ) {
   let mutationQueue: Promise<void> = Promise.resolve();
+  const confirmedProposals = new Set<string>();
 
   async function readStateImmediately() {
     return parseLocalAppState(await backend.get(LOCAL_APP_STATE_KEY));
@@ -58,6 +60,19 @@ export function createLocalTaskStore(
   }
 
   return {
+    confirmTaskProposal(proposal: TaskProposal) {
+      return enqueueMutation(async () => {
+        if (confirmedProposals.has(proposal.id))
+          throw new Error("这个操作已经执行过，请勿重复确认。");
+        const result = applyTaskProposalInState(
+          await readStateImmediately(),
+          proposal
+        );
+        await writeState(result.state);
+        confirmedProposals.add(proposal.id);
+        return result.task;
+      });
+    },
     async listTasks() {
       return (await readState()).tasks;
     },

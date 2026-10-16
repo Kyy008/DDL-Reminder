@@ -11,6 +11,8 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(AndroidRecentsPlugin.class);
         registerPlugin(AndroidWallpaperPlugin.class);
         registerPlugin(DdlSystemBarsPlugin.class);
+        registerPlugin(AssistantBridgePlugin.class);
+        registerPlugin(DataBackupPlugin.class);
         super.onCreate(savedInstanceState);
         AndroidRecentsPlugin.applySavedPreference(this);
     }

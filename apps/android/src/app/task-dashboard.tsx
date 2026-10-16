@@ -31,6 +31,12 @@ import DeadlinePicker, { TimeWheelColumn } from "./deadline-picker";
 import { NotificationSetupGuide } from "./notification-setup-guide";
 import { initializeReminderReconciliation } from "./reminder-reconciliation";
 import { WallpaperSettings } from "./wallpaper-settings";
+import { AssistantSettings, BackupSettings } from "./assistant-settings";
+import { TaskAssistant } from "./assistant-panel";
+import {
+  TASKS_CHANGED_EVENT,
+  ASSISTANT_OPEN_EVENT
+} from "@/lib/assistant-storage";
 
 type TaskDto = LocalTask;
 
@@ -233,6 +239,19 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
 
   useEffect(() => {
     void loadTasks();
+  }, [loadTasks]);
+
+  useEffect(() => {
+    const refresh = () => {
+      void loadTasks();
+    };
+    const showConversation = () => setActiveAction("view");
+    window.addEventListener(TASKS_CHANGED_EVENT, refresh);
+    window.addEventListener(ASSISTANT_OPEN_EVENT, showConversation);
+    return () => {
+      window.removeEventListener(TASKS_CHANGED_EVENT, refresh);
+      window.removeEventListener(ASSISTANT_OPEN_EVENT, showConversation);
+    };
   }, [loadTasks]);
 
   useEffect(() => {
@@ -693,7 +712,7 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
     <div className="flex h-full min-h-0 overflow-hidden">
       <TaskSidebar activeAction={activeAction} onSwitch={switchAction} />
 
-      <section className="min-w-0 flex-1 overflow-y-auto py-6 pl-20 pr-5 sm:pr-6 md:px-6 lg:px-8">
+      <section className="min-w-0 flex-1 overflow-y-auto pb-24 pl-20 pr-5 pt-6 sm:pr-6 md:px-6 lg:px-8">
         <div className="mx-auto flex max-w-6xl flex-col gap-8">
           <StatsSection stats={stats} />
 
@@ -786,6 +805,7 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
       ) : null}
 
       <MobileTaskDrawer activeAction={activeAction} onSwitch={switchAction} />
+      <TaskAssistant active={activeAction === "view"} />
     </div>
   );
 }
@@ -1400,48 +1420,75 @@ function SettingsPanel({
   onToggleHideFromRecents: () => void;
   settings: ReminderSettings;
 }) {
+  const [remindersExpanded, setRemindersExpanded] = useState(false);
+
   return (
     <div className="flex flex-col gap-6">
       <section className="glass-panel rounded-xl border border-[var(--border)] p-5 shadow-2xl shadow-black/20 sm:p-7">
         <div className="mb-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-semibold">设置</h1>
-          <div
-            className={`grid w-full gap-2 sm:flex sm:w-auto sm:items-center sm:justify-end ${
-              hasChanges ? "grid-cols-2" : "grid-cols-1"
-            }`}
-          >
-            {hasChanges ? (
+          {remindersExpanded || hasChanges ? (
+            <div
+              className={`grid w-full gap-2 sm:flex sm:w-auto sm:items-center sm:justify-end ${
+                hasChanges ? "grid-cols-2" : "grid-cols-1"
+              }`}
+            >
+              {hasChanges ? (
+                <button
+                  className="inline-flex h-10 min-w-0 items-center justify-center whitespace-nowrap rounded-md bg-rose-500 px-3 text-sm font-semibold leading-none text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-60 sm:min-w-24 sm:px-4"
+                  disabled={isSaving}
+                  onClick={onCancel}
+                  type="button"
+                >
+                  取消变更
+                </button>
+              ) : null}
               <button
-                className="inline-flex h-10 min-w-0 items-center justify-center whitespace-nowrap rounded-md bg-rose-500 px-3 text-sm font-semibold leading-none text-white transition hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-60 sm:min-w-24 sm:px-4"
-                disabled={isSaving}
-                onClick={onCancel}
+                className={`inline-flex h-10 min-w-0 items-center justify-center whitespace-nowrap rounded-md px-3 text-sm font-semibold leading-none transition disabled:cursor-not-allowed sm:min-w-24 sm:px-4 ${
+                  hasChanges && isThresholdOrderValid
+                    ? "bg-[var(--success)] text-white hover:bg-[var(--success-hover)]"
+                    : "bg-[var(--muted)] text-[var(--muted-foreground)]"
+                }`}
+                disabled={!hasChanges || isSaving || !isThresholdOrderValid}
+                onClick={onSave}
                 type="button"
               >
-                取消变更
+                {isSaving ? "保存中…" : "保存提醒设置"}
               </button>
-            ) : null}
-            <button
-              className={`inline-flex h-10 min-w-0 items-center justify-center whitespace-nowrap rounded-md px-3 text-sm font-semibold leading-none transition disabled:cursor-not-allowed sm:min-w-24 sm:px-4 ${
-                hasChanges && isThresholdOrderValid
-                  ? "bg-[var(--success)] text-white hover:bg-[var(--success-hover)]"
-                  : "bg-[var(--muted)] text-[var(--muted-foreground)]"
-              }`}
-              disabled={!hasChanges || isSaving || !isThresholdOrderValid}
-              onClick={onSave}
-              type="button"
-            >
-              {isSaving ? "保存中…" : "保存提醒设置"}
-            </button>
-          </div>
+            </div>
+          ) : null}
         </div>
 
         <div className="divide-y divide-[var(--border)]">
           <div className="flex items-center justify-between gap-4 py-4">
-            <span className="text-sm font-semibold">任务提醒</span>
+            <button
+              aria-controls="task-reminder-settings"
+              aria-expanded={remindersExpanded}
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-md py-2 text-left text-sm font-semibold focus-visible:outline-2 focus-visible:outline-[var(--primary)]"
+              onClick={() => setRemindersExpanded((current) => !current)}
+              type="button"
+            >
+              <span>任务提醒</span>
+              <span className="ml-auto text-xs font-normal text-[var(--muted-foreground)]">
+                {remindersExpanded ? "收起" : "展开"}
+              </span>
+              <svg
+                aria-hidden="true"
+                className={`size-4 shrink-0 text-[var(--muted-foreground)] transition-transform ${remindersExpanded ? "rotate-180" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
             <button
               aria-checked={settings.emailReminderEnabled}
               aria-label="启用系统通知提醒"
-              className={`relative h-7 w-12 rounded-full border transition ${
+              className={`relative h-7 w-12 shrink-0 rounded-full border transition ${
                 settings.emailReminderEnabled
                   ? "border-[var(--primary)] bg-[var(--primary)]"
                   : "border-[var(--border)] bg-[var(--muted)]"
@@ -1466,37 +1513,43 @@ function SettingsPanel({
             </button>
           </div>
 
-          <NotificationSetupGuide />
+          <div
+            className="divide-y divide-[var(--border)]"
+            hidden={!remindersExpanded}
+            id="task-reminder-settings"
+          >
+            <NotificationSetupGuide />
 
-          <div className="flex flex-col gap-5 py-4">
-            <SettingsDurationInput
-              label="临近提醒"
-              value={settings.approachingDuration}
-              onChange={(nextDuration) =>
-                onChange((currentSettings) => ({
-                  ...currentSettings,
-                  approachingDuration: nextDuration
-                }))
-              }
-            />
-            <SettingsDurationInput
-              label="紧急提醒"
-              value={settings.deadlineDuration}
-              onChange={(nextDuration) =>
-                onChange((currentSettings) => ({
-                  ...currentSettings,
-                  deadlineDuration: nextDuration
-                }))
-              }
-            />
-            {!isThresholdOrderValid ? (
-              <p
-                className="rounded-md border border-[var(--error-border)] bg-[var(--error-bg)] px-3 py-2 text-sm font-medium text-[var(--error-text)]"
-                role="alert"
-              >
-                临近提醒应早于或同时于紧急提醒。
-              </p>
-            ) : null}
+            <div className="flex flex-col gap-5 py-4">
+              <SettingsDurationInput
+                label="临近提醒"
+                value={settings.approachingDuration}
+                onChange={(nextDuration) =>
+                  onChange((currentSettings) => ({
+                    ...currentSettings,
+                    approachingDuration: nextDuration
+                  }))
+                }
+              />
+              <SettingsDurationInput
+                label="紧急提醒"
+                value={settings.deadlineDuration}
+                onChange={(nextDuration) =>
+                  onChange((currentSettings) => ({
+                    ...currentSettings,
+                    deadlineDuration: nextDuration
+                  }))
+                }
+              />
+              {!isThresholdOrderValid ? (
+                <p
+                  className="rounded-md border border-[var(--error-border)] bg-[var(--error-bg)] px-3 py-2 text-sm font-medium text-[var(--error-text)]"
+                  role="alert"
+                >
+                  临近提醒应早于或同时于紧急提醒。
+                </p>
+              ) : null}
+            </div>
           </div>
         </div>
       </section>
@@ -1534,6 +1587,8 @@ function SettingsPanel({
         </section>
       ) : null}
 
+      <AssistantSettings />
+      <BackupSettings />
       <div className="glass-panel rounded-xl border border-[var(--border)] px-5 shadow-2xl shadow-black/20 sm:px-7">
         <WallpaperSettings />
       </div>
