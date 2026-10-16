@@ -15,6 +15,7 @@
     "format:write": "prettier --write .",
     "android:sync": "npm run build && cap sync android",
     "android:open": "cap open android",
+    "android:private": "node scripts/build-private-android.mjs",
     "android:apk": "npm run build && cap sync android && cd android && ./gradlew assembleDebug"
   },
   "dependencies": {

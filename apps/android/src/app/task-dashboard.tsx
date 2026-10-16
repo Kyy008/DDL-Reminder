@@ -31,6 +31,12 @@ import DeadlinePicker, { TimeWheelColumn } from "./deadline-picker";
 import { NotificationSetupGuide } from "./notification-setup-guide";
 import { initializeReminderReconciliation } from "./reminder-reconciliation";
 import { WallpaperSettings } from "./wallpaper-settings";
+import { AssistantSettings, BackupSettings } from "./assistant-settings";
+import { TaskAssistant } from "./assistant-panel";
+import {
+  TASKS_CHANGED_EVENT,
+  ASSISTANT_OPEN_EVENT
+} from "@/lib/assistant-storage";
 
 type TaskDto = LocalTask;
 
@@ -233,6 +239,19 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
 
   useEffect(() => {
     void loadTasks();
+  }, [loadTasks]);
+
+  useEffect(() => {
+    const refresh = () => {
+      void loadTasks();
+    };
+    const showConversation = () => setActiveAction("view");
+    window.addEventListener(TASKS_CHANGED_EVENT, refresh);
+    window.addEventListener(ASSISTANT_OPEN_EVENT, showConversation);
+    return () => {
+      window.removeEventListener(TASKS_CHANGED_EVENT, refresh);
+      window.removeEventListener(ASSISTANT_OPEN_EVENT, showConversation);
+    };
   }, [loadTasks]);
 
   useEffect(() => {
@@ -693,7 +712,7 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
     <div className="flex h-full min-h-0 overflow-hidden">
       <TaskSidebar activeAction={activeAction} onSwitch={switchAction} />
 
-      <section className="min-w-0 flex-1 overflow-y-auto py-6 pl-20 pr-5 sm:pr-6 md:px-6 lg:px-8">
+      <section className="min-w-0 flex-1 overflow-y-auto pb-24 pl-20 pr-5 pt-6 sm:pr-6 md:px-6 lg:px-8">
         <div className="mx-auto flex max-w-6xl flex-col gap-8">
           <StatsSection stats={stats} />
 
@@ -786,6 +805,7 @@ export function TaskDashboard({ mode }: { mode: "public" | "manage" }) {
       ) : null}
 
       <MobileTaskDrawer activeAction={activeAction} onSwitch={switchAction} />
+      <TaskAssistant active={activeAction === "view"} />
     </div>
   );
 }
@@ -1534,6 +1554,8 @@ function SettingsPanel({
         </section>
       ) : null}
 
+      <AssistantSettings />
+      <BackupSettings />
       <div className="glass-panel rounded-xl border border-[var(--border)] px-5 shadow-2xl shadow-black/20 sm:px-7">
         <WallpaperSettings />
       </div>

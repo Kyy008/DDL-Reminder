@@ -2,6 +2,8 @@ name: Android CI
 
 on:
   push:
+    tags-ignore:
+      - "android-v*"
     paths:
       - "apps/android/**"
       - ".github/workflows/android-ci.yml"

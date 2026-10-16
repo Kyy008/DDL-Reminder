@@ -1,5 +1,33 @@
 @import "tailwindcss";
 
+.assistant-launcher {
+  position: fixed;
+  z-index: 40;
+  right: max(1.25rem, env(safe-area-inset-right));
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
+}
+
+.assistant-panel {
+  position: absolute;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  width: min(480px, calc(100vw - 2rem));
+  height: min(760px, calc(var(--assistant-viewport-height, 100dvh) - 2rem));
+  border-radius: 0.75rem;
+  outline: none;
+}
+
+@media (max-width: 639px) {
+  .assistant-panel {
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: min(88dvh, var(--assistant-viewport-height, 100dvh));
+    border-radius: 0.75rem 0.75rem 0 0;
+    border-bottom: 0;
+  }
+}
+
 :root {
   color-scheme: light;
   --background: #f7faf4;
