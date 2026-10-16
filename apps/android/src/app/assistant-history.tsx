@@ -2,11 +2,12 @@
 
 import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   ASSISTANT_HISTORY_EVENT,
   ASSISTANT_OPEN_EVENT,
+  deleteAssistantConversation,
   listAssistantConversations,
   saveAssistantEnabled,
   type ConversationRecord
@@ -17,8 +18,19 @@ export function AssistantHistory() {
   const [records, setRecords] = useState<ConversationRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [deleteRequested, setDeleteRequested] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const deleteLock = useRef(false);
+  const deleteTargetRef = useRef<string | null>(null);
+  const deleteDialogRef = useRef<HTMLElement>(null);
   const dialogRef = useRef<HTMLElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const requestDelete = useCallback((id: string | null) => {
+    deleteTargetRef.current = id;
+    setDeleteRequested(id);
+    setDeleteError("");
+  }, []);
   useEffect(() => {
     if (!open) return;
     let current = true;
@@ -56,12 +68,22 @@ export function AssistantHistory() {
     const opener = buttonRef.current;
     document.body.style.overflow = "hidden";
     dialogRef.current?.focus();
-    const close = () => setOpen(false);
+    const close = () => {
+      if (deleteTargetRef.current) {
+        if (!deleteLock.current) requestDelete(null);
+      } else setOpen(false);
+    };
     const keydown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
-      if (event.key === "Tab" && dialogRef.current) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        close();
+      }
+      const activeDialog = deleteTargetRef.current
+        ? deleteDialogRef.current
+        : dialogRef.current;
+      if (event.key === "Tab" && activeDialog) {
         const focusable = Array.from(
-          dialogRef.current.querySelectorAll<HTMLElement>(
+          activeDialog.querySelectorAll<HTMLElement>(
             'button:not([disabled]), [tabindex="0"]'
           )
         );
@@ -70,7 +92,7 @@ export function AssistantHistory() {
         if (
           event.shiftKey &&
           (document.activeElement === first ||
-            document.activeElement === dialogRef.current)
+            document.activeElement === activeDialog)
         ) {
           event.preventDefault();
           last?.focus();
@@ -95,8 +117,22 @@ export function AssistantHistory() {
       document.body.style.overflow = oldOverflow;
       opener?.focus();
     };
-  }, [open]);
+  }, [open, requestDelete]);
+  useEffect(() => {
+    if (!deleteRequested) return;
+    const opener =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+    const historyDialog = dialogRef.current;
+    deleteDialogRef.current?.focus();
+    return () => {
+      if (opener?.isConnected) opener.focus();
+      else historyDialog?.focus();
+    };
+  }, [deleteRequested]);
   async function continueConversation(id: string) {
+    if (deleteLock.current) return;
     try {
       // This explicit action also opts in if the assistant switch is off.
       await saveAssistantEnabled(true);
@@ -108,6 +144,22 @@ export function AssistantHistory() {
       setOpen(false);
     } catch {
       setError("对话未能打开，请稍后重试。");
+    }
+  }
+  async function deleteConversation(id: string) {
+    if (deleteLock.current || deleteRequested !== id) return;
+    deleteLock.current = true;
+    setDeleting(true);
+    try {
+      await deleteAssistantConversation(id);
+      setRecords((current) => current.filter((record) => record.id !== id));
+      requestDelete(null);
+      setError("");
+    } catch {
+      setDeleteError("对话未能删除，请重试。任务数据没有改动。");
+    } finally {
+      deleteLock.current = false;
+      setDeleting(false);
     }
   }
   return (
@@ -123,7 +175,10 @@ export function AssistantHistory() {
           ref={buttonRef}
           type="button"
           className="h-10 shrink-0 rounded-md border border-[var(--border)] bg-[var(--field)] px-4 text-sm font-semibold transition hover:border-[var(--primary)]"
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            requestDelete(null);
+            setOpen(true);
+          }}
         >
           查看历史对话
         </button>
@@ -142,6 +197,8 @@ export function AssistantHistory() {
                 tabIndex={-1}
                 role="dialog"
                 aria-modal="true"
+                aria-hidden={deleteRequested ? true : undefined}
+                inert={Boolean(deleteRequested)}
                 aria-labelledby="assistant-history-title"
                 className="dialog-panel glass-panel flex max-h-[calc(100dvh-2rem)] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-[var(--border)] shadow-2xl outline-none"
               >
@@ -196,7 +253,7 @@ export function AssistantHistory() {
                           {record.entries.filter((entry) => entry.text).at(-1)
                             ?.text || "任务操作记录"}
                         </p>
-                        <div className="mt-3 flex items-center justify-between gap-3">
+                        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                           <time
                             dateTime={record.updatedAt}
                             className="text-xs text-[var(--muted-foreground)]"
@@ -212,17 +269,98 @@ export function AssistantHistory() {
                               }
                             )}
                           </time>
-                          <button
-                            type="button"
-                            className="h-9 shrink-0 rounded-md bg-[var(--success)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--success-hover)]"
-                            onClick={() => void continueConversation(record.id)}
-                          >
-                            继续聊
-                          </button>
+                          <div className="grid grid-cols-2 gap-2 sm:shrink-0">
+                            <button
+                              type="button"
+                              disabled={deleting}
+                              className="inline-flex h-9 min-w-0 items-center justify-center whitespace-nowrap rounded-md border border-[var(--error-border)] px-4 text-sm font-semibold text-[var(--danger)] transition hover:bg-[var(--error-bg)] disabled:opacity-50"
+                              onClick={() => requestDelete(record.id)}
+                            >
+                              删除
+                            </button>
+                            <button
+                              type="button"
+                              disabled={deleting}
+                              className="inline-flex h-9 min-w-0 items-center justify-center whitespace-nowrap rounded-md bg-[var(--success)] px-4 text-sm font-semibold text-white transition hover:bg-[var(--success-hover)] disabled:opacity-50"
+                              onClick={() =>
+                                void continueConversation(record.id)
+                              }
+                            >
+                              继续聊
+                            </button>
+                          </div>
                         </div>
                       </article>
                     ))}
                   </div>
+                </div>
+              </section>
+            </div>,
+            document.body
+          )
+        : null}
+      {open && deleteRequested
+        ? createPortal(
+            <div
+              className="dialog-backdrop fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+              role="presentation"
+              onMouseDown={(event) => {
+                if (event.currentTarget === event.target && !deleteLock.current)
+                  requestDelete(null);
+              }}
+            >
+              <section
+                ref={deleteDialogRef}
+                tabIndex={-1}
+                role="alertdialog"
+                aria-modal="true"
+                aria-labelledby="assistant-delete-title"
+                aria-describedby="assistant-delete-description"
+                className="dialog-panel glass-panel max-h-[calc(100dvh-2rem)] w-full max-w-sm overflow-y-auto rounded-xl border border-[var(--border)] p-5 shadow-2xl outline-none"
+              >
+                <h2
+                  id="assistant-delete-title"
+                  className="text-base font-semibold"
+                >
+                  删除这条对话？
+                </h2>
+                <p className="mt-3 line-clamp-2 break-words text-sm leading-6">
+                  {
+                    records.find((record) => record.id === deleteRequested)
+                      ?.title
+                  }
+                </p>
+                <p
+                  id="assistant-delete-description"
+                  className="mt-2 text-sm leading-6 text-[var(--muted-foreground)]"
+                >
+                  删除后无法恢复，不会影响任务或其他对话。
+                </p>
+                {deleteError ? (
+                  <p
+                    role="alert"
+                    className="mt-3 text-sm text-[var(--error-text)]"
+                  >
+                    {deleteError}
+                  </p>
+                ) : null}
+                <div className="mt-5 grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={deleting}
+                    onClick={() => requestDelete(null)}
+                    className="inline-flex h-10 min-w-0 items-center justify-center whitespace-nowrap rounded-md bg-rose-500 px-3 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    取消
+                  </button>
+                  <button
+                    type="button"
+                    disabled={deleting}
+                    onClick={() => void deleteConversation(deleteRequested)}
+                    className="inline-flex h-10 min-w-0 items-center justify-center whitespace-nowrap rounded-md bg-[var(--success)] px-3 text-sm font-semibold text-white disabled:opacity-50"
+                  >
+                    {deleting ? "正在删除…" : "确认删除"}
+                  </button>
                 </div>
               </section>
             </div>,

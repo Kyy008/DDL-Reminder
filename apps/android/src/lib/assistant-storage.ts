@@ -168,6 +168,8 @@ function emptyRecord(): ConversationRecord {
   const time = new Date().toISOString();
   return {
     ...EMPTY_CONVERSATION,
+    messages: [],
+    entries: [],
     id: crypto.randomUUID(),
     title: "新对话",
     createdAt: time,
@@ -273,6 +275,10 @@ export function saveAssistantConversation(
     const prior = archive.conversations.find(
       (item) => item.id === (conversation.id ?? archive.activeId)
     );
+    if (conversation.id && !prior)
+      throw new Error(
+        "这条对话已删除，本次内容没有重新保存。任务数据不受影响。"
+      );
     const record: ConversationRecord = {
       ...(prior ?? emptyRecord()),
       ...conversation,
@@ -306,6 +312,18 @@ export function clearAssistantConversation(
     archive.activeId = replacement.id;
     await writeArchive(archive);
     return replacement;
+  });
+}
+
+export function deleteAssistantConversation(id: string): Promise<void> {
+  return enqueueHistory(async () => {
+    const archive = await readArchiveImmediately();
+    if (!archive.conversations.some((record) => record.id === id)) return;
+    archive.conversations = archive.conversations.filter(
+      (record) => record.id !== id
+    );
+    if (archive.activeId === id) archive.activeId = null;
+    await writeArchive(archive);
   });
 }
 

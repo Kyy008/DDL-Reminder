@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   clearAssistantConversation,
+  deleteAssistantConversation,
   getAssistantEnabled,
   getThinkingEffort,
   loadAssistantConversation,
@@ -165,6 +166,52 @@ describe("assistant preferences and history", () => {
       18
     );
     expect(trimAssistantConversation(record).messages).toHaveLength(18);
+  });
+  it("deletes only the selected conversation and preserves the other active conversation and task data", async () => {
+    const first = await saveAssistantConversation({
+      version: 1,
+      messages: [],
+      entries: [{ id: "one", role: "user", text: "删除这一条" }]
+    });
+    await startAssistantConversation();
+    const second = await saveAssistantConversation({
+      version: 1,
+      messages: [],
+      entries: [{ id: "two", role: "user", text: "保留这一条" }]
+    });
+    values.set("ddl-reminder:local-app-state", "preserved");
+    await deleteAssistantConversation(first.id);
+    expect(
+      (await listAssistantConversations()).map((record) => record.id)
+    ).toEqual([second.id]);
+    expect((await loadAssistantConversation()).id).toBe(second.id);
+    expect(values.get("ddl-reminder:local-app-state")).toBe("preserved");
+    await expect(loadAssistantConversation(first.id)).rejects.toThrow("不存在");
+  });
+  it("deletes the active conversation without resurrecting it on a late save", async () => {
+    const record = await startAssistantConversation();
+    const stale = {
+      ...record,
+      entries: [{ id: "u", role: "user" as const, text: "稍后完成的消息" }]
+    };
+    await deleteAssistantConversation(record.id);
+    await expect(saveAssistantConversation(stale)).rejects.toThrow("已删除");
+    expect(await listAssistantConversations()).toHaveLength(0);
+    const next = await startAssistantConversation();
+    expect(next.id).not.toBe(record.id);
+    expect(next.entries).toHaveLength(0);
+  });
+  it("repeated deletes and unknown IDs do not delete other conversations", async () => {
+    const saved = await saveAssistantConversation({
+      version: 1,
+      messages: [],
+      entries: [{ id: "kept", role: "user", text: "保留" }]
+    });
+    await deleteAssistantConversation("does-not-exist");
+    await deleteAssistantConversation("does-not-exist");
+    expect(
+      (await listAssistantConversations()).map((record) => record.id)
+    ).toEqual([saved.id]);
   });
   it("does not replace a legacy record until migration was durably saved", async () => {
     const legacy = {

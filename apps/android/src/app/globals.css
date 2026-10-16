@@ -1,4 +1,156 @@
 @import "tailwindcss";
+@import "katex/dist/katex.min.css";
+
+.assistant-markdown {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.assistant-markdown > :first-child {
+  margin-top: 0;
+}
+.assistant-markdown > :last-child {
+  margin-bottom: 0;
+}
+.assistant-markdown p,
+.assistant-markdown ul,
+.assistant-markdown ol,
+.assistant-markdown blockquote,
+.assistant-markdown pre,
+.assistant-markdown .assistant-table-scroll {
+  margin-block: 0.7em;
+}
+.assistant-markdown :is(h1, h2, h3, h4, h5, h6) {
+  margin-block: 1em 0.4em;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.assistant-markdown h1 {
+  font-size: 1.25em;
+}
+.assistant-markdown h2 {
+  font-size: 1.15em;
+}
+.assistant-markdown :is(h3, h4, h5, h6) {
+  font-size: 1.05em;
+}
+.assistant-markdown strong {
+  font-weight: 700;
+}
+.assistant-markdown em {
+  font-style: italic;
+}
+.assistant-markdown del {
+  text-decoration: line-through;
+}
+.assistant-markdown ul {
+  padding-left: 1.5em;
+  list-style: disc;
+}
+.assistant-markdown ol {
+  padding-left: 1.5em;
+  list-style: decimal;
+}
+.assistant-markdown li > :is(ul, ol) {
+  margin-block: 0.25em;
+}
+.assistant-markdown li > p {
+  margin-block: 0.3em;
+}
+.assistant-markdown .task-list-item {
+  list-style: none;
+}
+.assistant-markdown input[type="checkbox"] {
+  margin-right: 0.4em;
+  accent-color: var(--success);
+}
+.assistant-markdown blockquote {
+  padding-left: 0.85em;
+  border-left: 3px solid var(--border);
+  color: var(--muted-foreground);
+}
+.assistant-markdown hr {
+  margin-block: 1em;
+  border-color: var(--border);
+}
+.assistant-markdown a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.assistant-markdown :is(code, pre) {
+  font-family: ui-monospace, monospace;
+  font-size: 0.9em;
+}
+.assistant-markdown code {
+  padding: 0.15em 0.35em;
+  border-radius: 4px;
+  background: var(--muted);
+}
+.assistant-markdown pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 0.85em;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--field);
+  white-space: pre;
+  overflow-wrap: normal;
+}
+.assistant-markdown pre code {
+  padding: 0;
+  background: transparent;
+  font-size: 1em;
+}
+.assistant-markdown .assistant-table-scroll {
+  max-width: 100%;
+  overflow-x: auto;
+}
+.assistant-markdown table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+.assistant-markdown :is(th, td) {
+  border: 1px solid var(--border);
+  padding: 0.45em 0.7em;
+  min-width: 5em;
+  max-width: 22em;
+}
+.assistant-markdown th {
+  background: var(--muted);
+  font-weight: 700;
+}
+.assistant-markdown :is(th, td) p {
+  margin: 0;
+}
+.assistant-markdown .katex {
+  font-size: 1.08em;
+  overflow-wrap: normal;
+}
+.assistant-markdown .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-block: 0.3em;
+}
+.assistant-markdown :not(.katex-display) > .katex {
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  vertical-align: middle;
+  padding-block: 0.15em;
+}
+.assistant-markdown .katex-error {
+  font-family: ui-monospace, monospace;
+  color: var(--error-text) !important;
+  white-space: pre-wrap;
+}
+.assistant-image-description {
+  color: var(--muted-foreground);
+}
 
 .assistant-launcher {
   position: fixed;

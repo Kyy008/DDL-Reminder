@@ -2,8 +2,15 @@
 
 import { App } from "@capacitor/app";
 import { Capacitor } from "@capacitor/core";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState
+} from "react";
 import { createPortal } from "react-dom";
+import { AssistantMarkdown } from "@/app/assistant-markdown";
 import {
   ASSISTANT_MODEL_LABEL,
   getAssistantCredentialStatus,
@@ -65,6 +72,30 @@ export function TaskAssistant({ active }: { active: boolean }) {
   const dialogRef = useRef<HTMLElement>(null);
   const launcherRef = useRef<HTMLButtonElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const resizeInput = useCallback(() => {
+    const field = inputRef.current;
+    if (!field) return;
+    field.style.height = "0px";
+    const borderHeight = field.offsetHeight - field.clientHeight;
+    field.style.height = `${field.scrollHeight + borderHeight}px`;
+  }, []);
+  useLayoutEffect(() => {
+    resizeInput();
+  }, [input, visible, resizeInput]);
+  useEffect(() => {
+    const field = inputRef.current;
+    if (!visible || !field) return;
+    let width = field.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (field.clientWidth !== width) {
+        width = field.clientWidth;
+        resizeInput();
+      }
+    });
+    observer.observe(field);
+    return () => observer.disconnect();
+  }, [visible, resizeInput]);
 
   const updateEntries = useCallback(
     (update: (current: ChatEntry[]) => ChatEntry[]) => {
@@ -198,7 +229,7 @@ export function TaskAssistant({ active }: { active: boolean }) {
       if (event.key === "Tab" && dialogRef.current) {
         const buttons = Array.from(
           dialogRef.current.querySelectorAll<HTMLElement>(
-            'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), [tabindex="0"]'
+            'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), a[href], [tabindex="0"]'
           )
         );
         const first = buttons[0];
@@ -565,9 +596,13 @@ export function TaskAssistant({ active }: { active: boolean }) {
                         ) : (
                           <div
                             key={entry.id}
-                            className={`max-w-[94%] whitespace-pre-wrap break-words rounded-xl px-4 py-3 text-sm leading-7 ${entry.role === "user" ? "self-end bg-[var(--primary)] text-[var(--primary-foreground)]" : entry.role === "notice" ? "border border-[var(--border)] text-[var(--muted-foreground)]" : "self-start border border-[var(--border)] bg-[var(--glass-panel-strong)]"}`}
+                            className={`min-w-0 max-w-[94%] break-words rounded-xl px-4 py-3 text-sm leading-7 ${entry.role === "user" ? "self-end whitespace-pre-wrap bg-[var(--primary)] text-[var(--primary-foreground)]" : entry.role === "notice" ? "whitespace-pre-wrap border border-[var(--border)] text-[var(--muted-foreground)]" : "self-start border border-[var(--border)] bg-[var(--glass-panel-strong)]"}`}
                           >
-                            {entry.text}
+                            {entry.role === "assistant" ? (
+                              <AssistantMarkdown text={entry.text} />
+                            ) : (
+                              entry.text
+                            )}
                           </div>
                         )
                       )}
@@ -599,10 +634,11 @@ export function TaskAssistant({ active }: { active: boolean }) {
                     }}
                   >
                     <textarea
+                      ref={inputRef}
                       aria-label="给任务助手发消息"
-                      className="max-h-32 min-h-12 min-w-0 flex-1 resize-none rounded-lg border border-[var(--border)] bg-[var(--field)] px-3 py-3 text-sm outline-none focus:border-[var(--primary)]"
+                      className="h-12 max-h-32 min-h-12 min-w-0 flex-1 resize-none overflow-y-auto rounded-lg border border-[var(--border)] bg-[var(--field)] px-3 py-2.5 text-sm outline-none focus:border-[var(--primary)]"
                       placeholder="说说你想做什么…"
-                      rows={2}
+                      rows={1}
                       maxLength={8000}
                       value={input}
                       onChange={(event) => setInput(event.target.value)}
